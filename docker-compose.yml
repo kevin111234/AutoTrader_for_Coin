@@ -1,6 +1,6 @@
 version: "3.8"
 services:
-  auto-trader:
+  autotrader:
     build:
       context: .            # Dockerfile이 위치한 디렉토리
     volumes:

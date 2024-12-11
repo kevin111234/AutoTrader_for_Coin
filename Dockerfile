@@ -7,6 +7,10 @@ ENV PYTHONUNBUFFERED=1
 # 필요한 패키지 설치
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g gitmoji-cli \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 작업 디렉토리 설정
