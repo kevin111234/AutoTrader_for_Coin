@@ -113,12 +113,10 @@
 5.3 디렉토리 구조
     main.py                 # 메인 실행 스크립트
     config.py               # 설정 파일(API 키, 슬랙 URL, 기본 파라미터)
-    data_fetch.py           # 거래소 API를 통한 시세 데이터 수집 및 업데이트
-    indicators.py           # RSI, Bollinger Bands, OBV 등 지표 계산 함수
+    data_control.py         # 거래소 API를 통한 시세 데이터 수집 및 업데이트 및 RSI, Bollinger Bands, OBV 등 지표 계산
     strategy.py             # RSI 기반 매매 시그널, 변동성 점수 산출 로직
     order_executor.py       # 주문 실행(시장가/지정가/Stop-Limit), 포지션 관리
     notifier.py             # Slack 등 알림 모듈
-    logger.py               # 로깅 설정
     utils.py                # 기타 보조 함수(타임프레임 변환, 필터링 등)
 
 --------------------------------------------
