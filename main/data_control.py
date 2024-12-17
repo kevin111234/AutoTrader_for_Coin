@@ -4,15 +4,6 @@ class Data_Control():
     def __init__(self):
         print("Config에서 API 키를 불러옵니다.")
         print("API 객체 생성")
-    
-    def data(self,client):
-        print("데이터를 불러옵니다...")
-
-        print("데이터가 있는 경우 일부만 불러와 업데이트합니다.")
-
-        print("기술적 지표를 데이터에 추가합니다.")
-
-        print("데이터 로드 완료!")
 
     def get_current_price(self,client,symbol):
         print("현재 가격을 불러옵니다...")
@@ -63,3 +54,10 @@ class Data_Control():
         nor_rsi = int()
 
         return nor_rsi
+
+    def data(self,client):
+        print("데이터를 불러옵니다...")
+
+        print("기술적 지표를 데이터에 추가합니다.")
+
+        print("데이터 로드 완료!")
