@@ -77,3 +77,12 @@ class Data_Control():
         print("기술적 지표를 데이터에 추가합니다.")
         
         return data
+    
+    def data_update(self,client,symbol,timeframe,data):
+        print("가장 최신 데이터를 확인합니다. 캔들이 완성된 봉을 기준으로 확인합니다.")
+
+        print("데이터를 업데이트합니다")
+
+        print("기술적 지표를 업데이트합니다")
+
+        return data
