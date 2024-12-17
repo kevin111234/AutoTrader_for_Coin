@@ -55,9 +55,25 @@ class Data_Control():
 
         return nor_rsi
 
-    def data(self,client,symbol,timeframe,data=None):
-        print("데이터를 불러옵니다...")
+    def data(self,client,symbol,timeframe):
+        limit = 100
+        if timeframe == "1MINUTE":
+            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
+        elif timeframe == "5MINUTE":
+            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=limit)
+        elif timeframe == "1HOUR":
+            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=limit)
+        else:
+            raise ValueError("Invalid timeframe. Please use '1MINUTE', '5MINUTE', or '1HOUR'.")
+
+        # 새로운 데이터를 DataFrame으로 변환
+        data = pd.DataFrame(candles, columns=[
+            "Open Time", "Open", "High", "Low", "Close", "Volume",
+            "Close Time", "Quote Asset Volume", "Number of Trades",
+            "Taker Buy Base Asset Volume", "Taker Buy Quote Asset Volume", "Ignore"
+        ])
+        data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
 
         print("기술적 지표를 데이터에 추가합니다.")
-
-        print("데이터 로드 완료!")
+        
+        return data
