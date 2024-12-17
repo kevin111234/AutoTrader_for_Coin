@@ -1,9 +1,13 @@
+from binance.client import Client
+
 from config import Config
 
 def main():
     print("투자 프로그램을 시작합니다.")
     
     # Config에서 환경변수 및 고정변수 불러오기
+    config = Config()
+    client = Client(config.binance_access_key, config.binance_secret_key)
 
     # 초기 자산 조회 - notifier.py
 

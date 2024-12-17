@@ -5,7 +5,7 @@ class Data_Control():
         print("Config에서 API 키를 불러옵니다.")
         print("API 객체 생성")
     
-    def data(self):
+    def data(self,client):
         print("데이터를 불러옵니다...")
 
         print("데이터가 있는 경우 일부만 불러와 업데이트합니다.")
@@ -14,11 +14,10 @@ class Data_Control():
 
         print("데이터 로드 완료!")
 
-    def get_current_price(self):
+    def get_current_price(self,client,symbol):
         print("현재 가격을 불러옵니다...")
-
-        current_price = int()
-
+        price = client.get_symbol_ticker(symbol)
+        current_price = price["price"]
         return current_price
     
     def cal_rsi(self,data):
