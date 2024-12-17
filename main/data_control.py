@@ -55,7 +55,7 @@ class Data_Control():
 
         return nor_rsi
 
-    def data(self,client):
+    def data(self,client,symbol,timeframe,data=None):
         print("데이터를 불러옵니다...")
 
         print("기술적 지표를 데이터에 추가합니다.")
