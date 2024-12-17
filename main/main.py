@@ -1,23 +1,35 @@
 from binance.client import Client
 
 from config import Config
+from data_control import Data_Control
 
 def main():
     print("투자 프로그램을 시작합니다.")
     
     # Config에서 환경변수 및 고정변수 불러오기
     config = Config()
+    ticker_list = config.coin_tickers.split(" ")
     client = Client(config.binance_access_key, config.binance_secret_key)
+    data_control = Data_Control()
 
     # 초기 자산 조회 - notifier.py
 
     # 초기 데이터 수집 - data_control.py
+    for i in ticker_list:
+        i.split("-")
+        symbol = i[1]+i[0]
+        data_control.data(client, symbol, timeframe)
 
     # 반복문 시작
     while True:
         try:
             print("매수/매도 판단을 시작합니다.")
             # 현재 가격 조회
+            for i in ticker_list:
+                i.split("-")
+                symbol = i[1]+i[0]
+                timeframe = "5MINUTE"
+                data_control.data(client,symbol,timeframe)
 
             # 가격데이터 업데이트
 
