@@ -130,12 +130,31 @@ class Data_Control():
         return profile_df, sr_levels
 
 
-    def cal_OBV(self, data):
-        print("OBV를 계산합니다...")
+    def cal_obv(self, data, price_col='Close', volume_col='Volume'):
+        """
+        OBV(On-Balance Volume)를 계산하는 함수.
+        :param data: 'Close'와 'Volume' 컬럼을 포함한 pandas DataFrame
+        :param price_col: 종가 컬럼명(기본: 'Close')
+        :param volume_col: 거래량 컬럼명(기본: 'Volume')
+        :return: OBV 컬럼이 추가된 DataFrame
+        """
+        # Close와 Volume 시리즈를 준비
+        closes = data[price_col]
+        volumes = data[volume_col]
 
-        obv = []
+        obv = [0]  # 첫 번째 값은 0으로 시작
 
-        return obv
+        for i in range(1, len(data)):
+            if closes.iloc[i] > closes.iloc[i - 1]:
+                obv.append(obv[-1] + volumes.iloc[i])
+            elif closes.iloc[i] < closes.iloc[i - 1]:
+                obv.append(obv[-1] - volumes.iloc[i])
+            else:
+                # 종가가 이전 종가와 같은 경우 변화 없음
+                obv.append(obv[-1])
+
+        data['OBV'] = obv
+        return data
     
     def nor_rsi(self, data):
         print("RSI를 정규화합니다...")
