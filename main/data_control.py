@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 class Data_Control():
     def __init__(self):
-        print("Config에서 API 키를 불러옵니다.")
-        print("API 객체 생성")
+        pass
 
     def get_current_price(self,client,symbol):
         price = client.get_symbol_ticker(symbol)
