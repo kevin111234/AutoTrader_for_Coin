@@ -64,6 +64,7 @@ class Data_Control():
         data['Bollinger_MA'] = sma
         data['Bollinger_Upper'] = upper_band
         data['Bollinger_Lower'] = lower_band
+        data['Bollinger_BW'] = upper_band-lower_band
 
         return data
 
