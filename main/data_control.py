@@ -156,12 +156,19 @@ class Data_Control():
         data['OBV'] = obv
         return data
     
-    def nor_rsi(self, data):
-        print("RSI를 정규화합니다...")
-
-        nor_rsi = int()
-
-        return nor_rsi
+    def nor_rsi(self, rsi):
+        if rsi >= 50:
+            rsi = 100 - rsi
+        if rsi <= 20:
+            return 20
+        elif rsi <= 25:
+            return 25
+        elif rsi <= 30:
+            return 30
+        elif rsi <= 35:
+            return 35
+        else:
+            return 50
 
     def data(self,client,symbol,timeframe):
         limit = 100
