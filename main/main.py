@@ -18,10 +18,10 @@ def main():
     while True:
         try:
             print("매수/매도 판단을 시작합니다.")
+            for i in ticker_list:
             # 현재 가격 조회
 
             # 가격데이터 업데이트
-            for i in ticker_list:
                 i.split("-")
                 symbol = i[1]+i[0]
                 data_1m = data_control.data(client,symbol,"1MINUTE")

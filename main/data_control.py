@@ -11,25 +11,65 @@ class Data_Control():
         current_price = price["price"]
         return current_price
     
-    def cal_rsi(self,data):
+    def cal_rsi(self, data, period = 14):
         print("RSI를 계산합니다...")
 
-        rsi = int()
-        pre_rsi_1 = int()
-        pre_rsi_2 = int()
+        # 'Close' 컬럼의 변화량 계산
+        delta = data['Close'].diff()
+        gains = delta.clip(lower=0)
+        losses = -delta.clip(upper=0)
 
-        return rsi, pre_rsi_1, pre_rsi_2
+        # 초기 평균 계산 (첫 n개 구간)
+        avg_gain = gains[:period].mean()
+        avg_loss = losses[:period].mean()
+
+        avg_gain_list = [avg_gain]
+        avg_loss_list = [avg_loss]
+
+        # n번째 이후 값들에 대해 와일더 방식 적용
+        for i in range(period, len(gains)):
+            gain = gains.iloc[i]
+            loss = losses.iloc[i]
+
+            avg_gain = ((avg_gain * (period - 1)) + gain) / period
+            avg_loss = ((avg_loss * (period - 1)) + loss) / period
+
+            avg_gain_list.append(avg_gain)
+            avg_loss_list.append(avg_loss)
+
+        # RS 및 RSI 계산
+        rs = pd.Series(avg_gain_list, index=data.index[period-1:]) / pd.Series(avg_loss_list, index=data.index[period-1:])
+        rsi = 100 - (100 / (1 + rs))
+
+        # RSI를 원본 인덱스 전체로 확장. n-1 이전 구간은 RSI 미계산 구간이므로 NaN
+        rsi_full = pd.Series(index=data.index, dtype=float)
+        rsi_full.loc[rsi.index] = rsi
+
+        # 데이터프레임에 RSI 칼럼 추가
+        data['RSI'] = rsi_full
+        
+        return data
+
     
-    def cal_bollinger_band(self,data):
+    def cal_bollinger_band(self, data, period=20, num_std=2):
         print("볼린저밴드를 계산합니다...")
 
-        upper_band = int()
-        middle_band = int()
-        lower_band = int()
+        # Simple Moving Average(단순 이동 평균)
+        sma = data['Close'].rolling(window=period).mean()
 
-        bollinger_band = []
+        # Rolling Std Deviation(구간 표준편차)
+        std = data['Close'].rolling(window=period).std()
 
-        return bollinger_band
+        # Upper Band와 Lower Band 계산
+        upper_band = sma + (num_std * std)
+        lower_band = sma - (num_std * std)
+
+        # 결과 컬럼 추가
+        data['Bollinger_MA'] = sma
+        data['Bollinger_Upper'] = upper_band
+        data['Bollinger_Lower'] = lower_band
+
+        return data
 
     def cal_volume_profile(self, data):
         print("볼륨 프로파일을 계산합니다...")
