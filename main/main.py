@@ -24,8 +24,9 @@ def main():
             for i in ticker_list:
                 i.split("-")
                 symbol = i[1]+i[0]
-                timeframe = "5MINUTE"
-                data = data_control.data(client,symbol,timeframe)
+                data_1m = data_control.data(client,symbol,"1MINUTE")
+                data_5m = data_control.data(client,symbol,"5MINUTE")
+                data_1h = data_control.data(client,symbol,"1HOUR")
 
             # 매수/매도 판단
 
