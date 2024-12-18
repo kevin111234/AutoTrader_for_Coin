@@ -187,7 +187,7 @@ class Data_Control():
             "Close Time", "Quote Asset Volume", "Number of Trades",
             "Taker Buy Base Asset Volume", "Taker Buy Quote Asset Volume", "Ignore"
         ])
-        selected_columns = ["Open Time", "Open", "High", "Low", "Close", "Volume"]
+        selected_columns = ["Open Time", "Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume", "Taker Buy Quote Asset Volume"]
         data = data[selected_columns]
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
 
