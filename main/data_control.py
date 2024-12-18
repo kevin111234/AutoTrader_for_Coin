@@ -1,19 +1,18 @@
 from config import Config
+
 import pandas as pd
+import numpy as np
 class Data_Control():
     def __init__(self):
         print("Config에서 API 키를 불러옵니다.")
         print("API 객체 생성")
 
     def get_current_price(self,client,symbol):
-        print("현재 가격을 불러옵니다...")
         price = client.get_symbol_ticker(symbol)
         current_price = price["price"]
         return current_price
     
     def cal_rsi(self, data, period = 14):
-        print("RSI를 계산합니다...")
-
         # 'Close' 컬럼의 변화량 계산
         delta = data['Close'].diff()
         gains = delta.clip(lower=0)
@@ -52,8 +51,6 @@ class Data_Control():
 
     
     def cal_bollinger_band(self, data, period=20, num_std=2):
-        print("볼린저밴드를 계산합니다...")
-
         # Simple Moving Average(단순 이동 평균)
         sma = data['Close'].rolling(window=period).mean()
 
@@ -71,15 +68,67 @@ class Data_Control():
 
         return data
 
-    def cal_volume_profile(self, data):
-        print("볼륨 프로파일을 계산합니다...")
+    def cal_tpo_volume_profile(data, price_col='Close', volume_col='Volume', bins=20):
+        """
+        TPO(Time at Price)와 볼륨 프로파일을 함께 계산하는 함수.
+        - 각 가격 구간별 거래량(VP)과 TPO(해당 가격 구간에 캔들이 위치한 횟수)를 계산
+        - 이후 이 정보를 토대로 지지/저항 구간을 식별하는데 활용 가능.
+        """
 
-        support_price = int()
-        resistance_price = int()
+        prices = data[price_col]
+        volumes = data[volume_col]
 
-        self.volume_profile = []
+        # 가격 범위 설정
+        price_min, price_max = prices.min(), prices.max()
+        bin_edges = np.linspace(price_min, price_max, bins + 1)
 
-        return support_price, resistance_price
+        # 각 가격이 속하는 구간 식별
+        bin_indices = np.digitize(prices, bin_edges)  # 1 ~ bins+1 범위로 결과 나옴
+
+        # 볼륨 프로파일: 구간별 거래량 합계
+        volume_profile = pd.Series(0.0, index=range(1, bins + 1))
+        # TPO 프로파일: 구간별 등장 횟수(= 시장이 해당 가격대 근처에 머문 횟수)
+        tpo_profile = pd.Series(0, index=range(1, bins + 1))
+
+        for idx, vol in zip(bin_indices, volumes):
+            if 1 <= idx <= bins:
+                volume_profile[idx] += vol
+                tpo_profile[idx] += 1  # 해당 구간에 한 번 머물렀다고 카운트
+
+        # 결과 DataFrame 생성
+        profile_df = pd.DataFrame({
+            'Bin': range(1, bins + 1),
+            'Price_Low': bin_edges[:-1],
+            'Price_High': bin_edges[1:],
+            'Volume': volume_profile.values,
+            'TPO': tpo_profile.values
+        })
+
+        # 거래량과 TPO 모두 상위권인 구간 식별 로직 (예: 단순 가중합)
+        # 여기서는 간단히 Volume과 TPO를 정규화하여 합산 후 상위 몇개 구간 추출
+        profile_df['Volume_norm'] = profile_df['Volume'] / profile_df['Volume'].sum()
+        profile_df['TPO_norm'] = profile_df['TPO'] / profile_df['TPO'].sum()
+        # 가중합 (가중치는 상황에 따라 조정 가능, 여기서는 동등 가중)
+        profile_df['Score'] = profile_df['Volume_norm'] + profile_df['TPO_norm']
+
+        # Score 기준 내림차순 정렬
+        sorted_df = profile_df.sort_values('Score', ascending=False).reset_index(drop=True)
+        
+        # 상위 3개를 잠재적 지지/저항 구간으로 추출 (예시)
+        top_zones = sorted_df.head(3)
+
+        # 가장 높은 Score를 가진 구간을 POC로 간주
+        poc = top_zones.iloc[0].to_dict()
+        other_zones = top_zones.iloc[1:].to_dict('records')
+
+        # 지지/저항선 정보 dictionary
+        sr_levels = {
+            'POC': poc,
+            'Levels': other_zones
+        }
+
+        return profile_df, sr_levels
+
 
     def cal_OBV(self, data):
         print("OBV를 계산합니다...")
