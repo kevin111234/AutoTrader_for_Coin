@@ -188,6 +188,6 @@ class Data_Control():
         ])
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
 
-        print("기술적 지표를 데이터에 추가합니다.")
+        data = Data_Control.cal_bollinger_band(Data_Control.cal_rsi(Data_Control.cal_obv(data)))
         
         return data
