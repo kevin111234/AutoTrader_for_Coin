@@ -214,7 +214,5 @@ class Data_Control():
         data = data[selected_columns]
         data["Taker Sell Base Asset Volume"] = data["Volume"] - data["Taker Buy Base Asset Volume"]
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
-
-        data = Data_Control.cal_bollinger_band(Data_Control.cal_rsi(Data_Control.cal_obv(data)))
         
         return data
