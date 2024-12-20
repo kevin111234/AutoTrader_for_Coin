@@ -68,7 +68,7 @@ class Data_Control():
 
         return data
 
-    def cal_tpo_volume_profile(data, 
+    def cal_tpo_volume_profile(self, data, 
                               price_col='Close', 
                               volume_col='Volume', 
                               taker_buy_col='Taker Buy Base Asset Volume', 
@@ -214,5 +214,55 @@ class Data_Control():
         data = data[selected_columns]
         data["Taker Sell Base Asset Volume"] = data["Volume"] - data["Taker Buy Base Asset Volume"]
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
+        data = data.sort_values(by="Open Time").reset_index(drop=True)
         
         return data
+    
+    def update_data(self, client, symbol, timeframe, existing_data):
+        try:
+            # 최신 23개 데이터 가져오기 (가장 긴 기간인 Bollinger Band 기준)
+            if timeframe == "1MINUTE":
+                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=23)
+            elif timeframe == "5MINUTE":
+                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=23)
+            elif timeframe == "1HOUR":
+                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=23)
+            else:
+                raise ValueError("Invalid timeframe")
+
+            # 새로운 데이터를 DataFrame으로 변환
+            temp_data = pd.DataFrame(candles, columns=[
+                "Open Time", "Open", "High", "Low", "Close", "Volume",
+                "Close Time", "Quote Asset Volume", "Number of Trades",
+                "Taker Buy Base Asset Volume", "Taker Buy Quote Asset Volume", "Ignore"
+            ])
+            
+            # 필요한 컬럼만 선택 및 전처리
+            selected_columns = ["Open Time", "Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume"]
+            temp_data = temp_data[selected_columns]
+            temp_data["Taker Sell Base Asset Volume"] = temp_data["Volume"] - temp_data["Taker Buy Base Asset Volume"]
+            temp_data["Open Time"] = pd.to_datetime(temp_data["Open Time"], unit='ms')
+            
+            # 기술적 지표 계산
+            if 'RSI' in existing_data.columns:
+                temp_data = self.cal_rsi(temp_data)
+            if 'Bollinger_MA' in existing_data.columns:
+                temp_data = self.cal_bollinger_band(temp_data)
+            if 'OBV' in existing_data.columns:
+                temp_data = self.cal_obv(temp_data)
+                
+            # 최신 3개 데이터만 추출
+            new_data = temp_data.tail(3)
+            
+            ## `Open Time` 기준 병합
+            combined_data = pd.concat([existing_data, new_data]).drop_duplicates(subset="Open Time", keep="last")
+            combined_data = combined_data.sort_values(by="Open Time").reset_index(drop=True)
+
+            if len(combined_data) > 100:
+                combined_data = combined_data.iloc[-100:].reset_index(drop=True)
+
+            return combined_data
+            
+        except Exception as e:
+            print(f"데이터 업데이트 중 오류 발생: {e}")
+            return existing_data

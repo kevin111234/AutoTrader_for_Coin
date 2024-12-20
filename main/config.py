@@ -7,9 +7,9 @@ class Config():
         self.binance_access_key = os.getenv("BINANCE_ACCESS_KEY")
         self.binance_secret_key = os.getenv("BINANCE_SECRET_KEY")
         self.slack_api_key = os.getenv("SLACK_API_KEY")
-        self.slack_asset_channel_id = os.getenv("SKACK_ASSET_CHANNEL_ID")
-        self.slack_trade_channel_id = os.getenv("SKACK_TRADE_CHANNEL_ID")
-        self.slack_error_channel_id = os.getenv("SKACK_ERROR_CHANNEL_ID")
+        self.slack_asset_channel_id = os.getenv("SLACK_ASSET_CHANNEL_ID")
+        self.slack_trade_channel_id = os.getenv("SLACK_TRADE_CHANNEL_ID")
+        self.slack_error_channel_id = os.getenv("SLACK_ERROR_CHANNEL_ID")
 
         self.seed_money = os.getenv("SEED_MONEY")
         self.coin_tickers = os.getenv("COIN_TICKERS")
