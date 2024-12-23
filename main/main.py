@@ -27,10 +27,11 @@ def main():
             data = data_control.data(client, symbol, timeframe, limit=200)
             data = data_control.cal_moving_average(data, period=20, method="SMA")
             data = data_control.cal_rsi(data_control.cal_bollinger_band(data_control.cal_obv(data)))
-            profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)  # 함수 실행
+            
             if len(data) > 100:
                 data = data.iloc[-100:].reset_index(drop=True)
             initial_data[symbol][timeframe] = data
+            profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)  # 함수 실행
             
             vp_data[symbol][timeframe] = profile_df
             tpo_data[symbol][timeframe] = sr_levels
