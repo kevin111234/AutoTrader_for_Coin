@@ -11,6 +11,25 @@ class Data_Control():
         current_price = price["price"]
         return current_price
     
+    def cal_moving_average(self, data, period=20, method='SMA'):
+        """
+        이동평균선을 계산하는 함수
+        :param data: 'Close' 컬럼을 포함한 pandas DataFrame
+        :param period: 이동평균을 계산할 기간 (기본값: 20)
+        :param method: 이동평균 방식 ('SMA' 또는 'EMA')
+        :return: 이동평균선이 추가된 DataFrame
+        """
+        if method == 'SMA':
+            # 단순 이동평균(SMA)
+            data[f'SMA_{period}'] = data['Close'].rolling(window=period).mean()
+        elif method == 'EMA':
+            # 지수 이동평균(EMA)
+            data[f'EMA_{period}'] = data['Close'].ewm(span=period, adjust=False).mean()
+        else:
+            raise ValueError("method는 'SMA' 또는 'EMA' 중 하나여야 합니다.")
+
+        return data
+    
     def cal_rsi(self, data, period = 14):
         # 'Close' 컬럼의 변화량 계산
         delta = data['Close'].diff()
@@ -193,8 +212,8 @@ class Data_Control():
         else:
             return 50
 
-    def data(self,client,symbol,timeframe):
-        limit = 100
+    def data(self,client,symbol,timeframe, limit = 100):
+        
         if timeframe == "1MINUTE":
             candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
         elif timeframe == "5MINUTE":
