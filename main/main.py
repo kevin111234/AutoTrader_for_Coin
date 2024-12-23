@@ -25,7 +25,8 @@ def main():
 
         for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
             data = data_control.data(client, symbol, timeframe, limit=200)
-            data = data_control.cal_moving_average(data, period=20, method="SMA")
+            for period in [20, 60, 100]:
+                data = data_control.cal_moving_average(data, period, method="SMA")
             data = data_control.cal_rsi(data_control.cal_bollinger_band(data_control.cal_obv(data)))
             
             if len(data) > 100:

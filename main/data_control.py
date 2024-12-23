@@ -263,6 +263,9 @@ class Data_Control():
             temp_data["Open Time"] = pd.to_datetime(temp_data["Open Time"], unit='ms')
             
             # 기술적 지표 계산
+            for period in [20, 60, 100]:
+                if f'SMA_{period}' in existing_data.columns:
+                    temp_data = self.cal_moving_average(temp_data, period, method="SMA")
             if 'RSI' in existing_data.columns:
                 temp_data = self.cal_rsi(temp_data)
             if 'Bollinger_MA' in existing_data.columns:
