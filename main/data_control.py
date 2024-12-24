@@ -11,7 +11,7 @@ class Data_Control():
         current_price = price["price"]
         return current_price
     
-    def cal_moving_average(self, data, period=20, method='SMA'):
+    def cal_moving_average(self, data, period=[20, 60, 120]):
         """
         이동평균선을 계산하는 함수
         :param data: 'Close' 컬럼을 포함한 pandas DataFrame
@@ -19,14 +19,9 @@ class Data_Control():
         :param method: 이동평균 방식 ('SMA' 또는 'EMA')
         :return: 이동평균선이 추가된 DataFrame
         """
-        if method == 'SMA':
-            # 단순 이동평균(SMA)
+        # 단순 이동평균(SMA)
+        for i in period:
             data[f'SMA_{period}'] = data['Close'].rolling(window=period).mean()
-        elif method == 'EMA':
-            # 지수 이동평균(EMA)
-            data[f'EMA_{period}'] = data['Close'].ewm(span=period, adjust=False).mean()
-        else:
-            raise ValueError("method는 'SMA' 또는 'EMA' 중 하나여야 합니다.")
 
         return data
     
@@ -67,6 +62,12 @@ class Data_Control():
         
         return data
 
+    # RSI 시그널 선 계산 (기본 14일)
+    def cal_rsi_signal(self, data, signal_period=14):
+        if 'RSI' in data.columns:
+            data['RSI_Signal'] = data['RSI'].rolling(window=signal_period, min_periods=1).mean()
+        
+        return data
     
     def cal_bollinger_band(self, data, period=20, num_std=2):
         # Simple Moving Average(단순 이동 평균)
@@ -267,7 +268,7 @@ class Data_Control():
                 if f'SMA_{period}' in existing_data.columns:
                     temp_data = self.cal_moving_average(temp_data, period, method="SMA")
             if 'RSI' in existing_data.columns:
-                temp_data = self.cal_rsi(temp_data)
+                temp_data = self.cal_rsi_signal(self.cal_rsi(temp_data))
             if 'Bollinger_MA' in existing_data.columns:
                 temp_data = self.cal_bollinger_band(temp_data)
             if 'OBV' in existing_data.columns:

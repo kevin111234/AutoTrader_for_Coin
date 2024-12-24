@@ -25,9 +25,10 @@ def main():
 
         for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
             data = data_control.data(client, symbol, timeframe, limit=200)
-            for period in [20, 60, 100]:
-                data = data_control.cal_moving_average(data, period, method="SMA")
-            data = data_control.cal_rsi(data_control.cal_bollinger_band(data_control.cal_obv(data)))
+            data = data_control.cal_rsi_signal(data_control.cal_rsi(data_control.cal_bollinger_band(data_control.cal_obv(data_control.cal_moving_average(data)))))
+
+            # 비어있는 값 제거
+            data = data.dropna()
             
             if len(data) > 100:
                 data = data.iloc[-100:].reset_index(drop=True)
