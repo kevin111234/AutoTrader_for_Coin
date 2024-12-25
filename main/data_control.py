@@ -11,9 +11,41 @@ class Data_Control():
         current_price = price["price"]
         return current_price
     
-    def cal_moving_average(self, data, period=[20, 60, 120]):
-
-        return data
+    def cal_moving_average(self, df, period=[20, 60, 120]):
+        """
+        period 리스트에 명시된 기간별 이동평균선을 구해주는 함수.
+        이미 계산된 구간은 건너뛰고, NaN인 부분만 업데이트함.
+        예: period=[20,60,120] -> ma_20, ma_60, ma_120 열 생성/갱신
+        """
+        
+        # period 리스트에 있는 각 기간별로 이동평균선 계산
+        for p in period:
+            col_name = f"SMA_{p}"
+            
+            # (1) SNA_XX 컬럼 없으면 만들기
+            if col_name not in df.columns:
+                df[col_name] = np.nan
+            
+            # (2) 이미 계산된 마지막 인덱스 찾기
+            last_valid = df[col_name].last_valid_index()
+            if last_valid is None:
+                last_valid = -1
+            
+            # (3) 마지막 계산 인덱스 + 1부터 끝까지
+            for i in range(last_valid + 1, len(df)):
+                # p일치 안 되면 계산 불가
+                if i < p - 1:
+                    continue
+                
+                # 값이 이미 있으면 건너뛰기
+                if not pd.isna(df.loc[i, col_name]):
+                    continue
+                
+                # 직전 p개 구간 mean
+                window_close = df.loc[i - p + 1 : i, 'close']
+                df.loc[i, col_name] = window_close.mean()
+        
+        return df
     
     def cal_rsi(self, df, period = 14, signal_period = 14):
     
