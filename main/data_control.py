@@ -311,7 +311,8 @@ class Data_Control():
             'Spread_20_60', 'Spread_60_120', 'Spread_20_120',
             'Spread_20_60_diff', 'Spread_60_120_diff', 'Spread_20_120_diff',
             'OBV', 'OBV_diff',
-            'Trend'
+            'Trend',
+            'Spread_20_60_MA', 'Spread_60_120_MA', 'Spread_20_120_MA'
         ]
         for col in needed_cols:
             if col not in df.columns:
@@ -370,6 +371,9 @@ class Data_Control():
             df.loc[i, 'Spread_20_60']  = sma20 - sma60
             df.loc[i, 'Spread_60_120'] = sma60 - sma120
             df.loc[i, 'Spread_20_120'] = sma20 - sma120
+            df.loc[i, 'Spread_20_60_MA'] = df.loc[i-19:i, 'Spread_20_60'].mean()
+            df.loc[i, 'Spread_60_120_MA'] = df.loc[i-19:i, 'Spread_60_120'].mean()
+            df.loc[i, 'Spread_20_120_MA'] = df.loc[i-19:i, 'Spread_20_120'].mean()
 
             # =============== (3) Spread 기울기(3틱 전 대비 차이) ===============
             # i-3 >= 0 일 때만 계산 가능
