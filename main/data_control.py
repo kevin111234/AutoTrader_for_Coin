@@ -16,8 +16,57 @@ class Data_Control():
         return data
     
     def cal_rsi(self, data, period = 14, signal_period = 14):
-        
-        return data
+        df = data.copy()
+    
+        # 1) rsi / rsi_signal 컬럼이 없으면 만들어 둠
+        if 'rsi' not in df.columns:
+            df['rsi'] = np.nan
+        if 'rsi_signal' not in df.columns:
+            df['rsi_signal'] = np.nan
+
+        # 2) 이미 계산된 구간(last_valid_rsi) 찾아서, 그 다음 행부터 재계산
+        last_valid_rsi = df['rsi'].last_valid_index()
+        if last_valid_rsi is None:
+            last_valid_rsi = -1  # 전부 NaN이면 -1로 설정 -> 0부터 계산
+
+        # 3) for문으로 last_valid_rsi + 1 ~ 끝까지 순회
+        for i in range(last_valid_rsi + 1, len(df)):
+            # period 미만 구간은 RSI를 정확히 구하기 어려우니 skip
+            if i < period:
+                continue
+            
+            # 이미 NaN이 아니면 = 계산돼 있다면 패스
+            if pd.isna(df.loc[i, 'rsi']):
+                # (a) rolling 방식으로 i번째 행까지 slice하여 RSI 계산
+                window_df = df.loc[:i].copy()
+                window_df['diff'] = window_df['close'].diff()
+                window_df['gain'] = window_df['diff'].clip(lower=0)
+                window_df['loss'] = -window_df['diff'].clip(upper=0)
+                window_df['avg_gain'] = window_df['gain'].rolling(period).mean()
+                window_df['avg_loss'] = window_df['loss'].rolling(period).mean()
+                
+                last_avg_gain = window_df['avg_gain'].iloc[-1]
+                last_avg_loss = window_df['avg_loss'].iloc[-1]
+                
+                if pd.isna(last_avg_gain) or pd.isna(last_avg_loss):
+                    # rolling 구간이 아직 안 찼다면 NaN 유지
+                    continue
+                
+                if last_avg_loss == 0:
+                    # 하락이 전혀 없으면 RSI=100 처리
+                    rsi_val = 100.0
+                else:
+                    rs = last_avg_gain / last_avg_loss
+                    rsi_val = 100 - (100 / (1 + rs))
+                
+                df.loc[i, 'rsi'] = rsi_val
+            
+            # (b) signal_period가 있다면, i번째 RSI까지 rolling으로 rsi_signal 계산
+            if signal_period > 0 and i >= signal_period and not pd.isna(df.loc[i, 'rsi']):
+                rsi_signal_val = df.loc[:i, 'rsi'].rolling(signal_period).mean().iloc[-1]
+                df.loc[i, 'rsi_signal'] = rsi_signal_val
+
+        return df
     
     def nor_rsi(self, rsi):
         if rsi >= 50:
