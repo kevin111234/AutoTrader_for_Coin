@@ -216,9 +216,49 @@ class Data_Control():
 
         return profile_df, sr_levels
 
-    def cal_obv(self, data, price_col='Close', volume_col='Volume'):
-        
-        return data
+    def cal_obv(self, df, price_col='Close', volume_col='Volume'):
+        """
+        OBV(On-Balance Volume) 계산
+        - 이미 계산된 구간은 건너뛰고, NaN인 곳만 업데이트
+        - OBV[i] = OBV[i-1] + volume  (종가 상승 시)
+                = OBV[i-1] - volume  (종가 하락 시)
+                = OBV[i-1]           (종가 동일 시)
+        """
+
+        # 1) obv 컬럼 없으면 만들어 둠
+        if 'obv' not in df.columns:
+            df['obv'] = np.nan
+
+        # 2) 마지막으로 유효한 인덱스 찾기
+        last_valid = df['obv'].last_valid_index()
+        if last_valid is None:
+            last_valid = -1  # 전부 NaN이면 -1로 설정
+
+        # 3) last_valid + 1부터 끝까지 계산
+        for i in range(last_valid + 1, len(df)):
+            # 맨 첫 행이면 초기값 설정 (볼륨 그대로 넣거나 0으로 시작 등 원하는 로직)
+            if i == 0:
+                df.loc[i, 'obv'] = df.loc[i, volume_col]
+                continue
+            
+            # 이미 값이 있으면 스킵
+            if not pd.isna(df.loc[i, 'obv']):
+                continue
+            
+            prev_price = df.loc[i - 1, price_col]
+            curr_price = df.loc[i, price_col]
+            prev_obv = df.loc[i - 1, 'obv'] if not pd.isna(df.loc[i - 1, 'obv']) else 0
+            curr_vol = df.loc[i, volume_col]
+
+            if curr_price > prev_price:
+                df.loc[i, 'obv'] = prev_obv + curr_vol
+            elif curr_price < prev_price:
+                df.loc[i, 'obv'] = prev_obv - curr_vol
+            else:
+                # 가격이 동일하다면 변화 없음
+                df.loc[i, 'obv'] = prev_obv
+
+        return df
     
     def LT_trand_check(self, data):
         
