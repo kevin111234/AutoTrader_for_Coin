@@ -15,8 +15,7 @@ class Data_Control():
 
         return data
     
-    def cal_rsi(self, data, period = 14, signal_period = 14):
-        df = data.copy()
+    def cal_rsi(self, df, period = 14, signal_period = 14):
     
         # 1) rsi / rsi_signal 컬럼이 없으면 만들어 둠
         if 'rsi' not in df.columns:
@@ -82,9 +81,55 @@ class Data_Control():
         else:
             return 50
     
-    def cal_bollinger_band(self, data, period=20, num_std=2):
+    def cal_bollinger_band(self, df, period=20, num_std=2):
+        """
+        data: 'close' 열이 포함된 pandas DataFrame
+        period: 볼린저 밴드 계산용 이동평균 기간 (기본=20)
+        num_std: 표준편차 배수 (기본=2)
+        """
         
-        return data
+        # 1) 볼린저 컬럼들이 없으면 만들어 둠
+        if 'middle_boll' not in df.columns:
+            df['middle_boll'] = np.nan
+        if 'upper_boll' not in df.columns:
+            df['upper_boll'] = np.nan
+        if 'lower_boll' not in df.columns:
+            df['lower_boll'] = np.nan
+
+        # 2) 마지막으로 유효한(=NaN이 아닌) 중간선(middle_boll) 인덱스를 찾음
+        #    세 컬럼 중 하나만 봐도 되지만, 여기선 middle_boll 기준으로 예시
+        last_valid_boll = df['middle_boll'].last_valid_index()
+        if last_valid_boll is None:
+            last_valid_boll = -1  # 전부 NaN이면 -1로 설정해서 0부터 계산
+
+        # 3) last_valid_boll + 1부터 끝까지 순회
+        for i in range(last_valid_boll + 1, len(df)):
+            # period 미만 구간은 볼린저밴드 계산 불가능 -> skip
+            if i < period:
+                continue
+            
+            # 이미 값이 들어있다면( NaN이 아니라면 ) 건너뛰기
+            # 혹은 middle/upper/lower 중 하나라도 NaN이면 재계산
+            if (pd.notna(df.loc[i, 'middle_boll']) and 
+                pd.notna(df.loc[i, 'upper_boll']) and
+                pd.notna(df.loc[i, 'lower_boll'])):
+                continue
+            
+            # i번째 행까지 slice해서 rolling
+            window_series = df.loc[:i, 'close'].rolling(period)
+            mean_val = window_series.mean().iloc[-1]
+            std_val = window_series.std().iloc[-1]
+
+            # 볼린저밴드 계산
+            upper_val = mean_val + num_std * std_val
+            lower_val = mean_val - num_std * std_val
+
+            # 해당 인덱스에 기록
+            df.loc[i, 'middle_boll'] = mean_val
+            df.loc[i, 'upper_boll'] = upper_val
+            df.loc[i, 'lower_boll'] = lower_val
+
+        return df
 
     def cal_tpo_volume_profile(self, data, 
                               price_col='Close', 
