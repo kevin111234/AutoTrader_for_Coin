@@ -42,7 +42,7 @@ class Data_Control():
                     continue
                 
                 # 직전 p개 구간 mean
-                window_close = df.loc[i - p + 1 : i, 'close']
+                window_close = df.loc[i - p + 1 : i, 'Close']
                 df.loc[i, col_name] = window_close.mean()
         
         return df
@@ -70,7 +70,7 @@ class Data_Control():
             if pd.isna(df.loc[i, 'rsi']):
                 # (a) rolling 방식으로 i번째 행까지 slice하여 RSI 계산
                 window_df = df.loc[:i].copy()
-                window_df['diff'] = window_df['close'].diff()
+                window_df['diff'] = window_df['Close'].diff()
                 window_df['gain'] = window_df['diff'].clip(lower=0)
                 window_df['loss'] = -window_df['diff'].clip(upper=0)
                 window_df['avg_gain'] = window_df['gain'].rolling(period).mean()
@@ -115,7 +115,7 @@ class Data_Control():
     
     def cal_bollinger_band(self, df, period=20, num_std=2):
         """
-        data: 'close' 열이 포함된 pandas DataFrame
+        data: 'Close' 열이 포함된 pandas DataFrame
         period: 볼린저 밴드 계산용 이동평균 기간 (기본=20)
         num_std: 표준편차 배수 (기본=2)
         """
@@ -148,7 +148,7 @@ class Data_Control():
                 continue
             
             # i번째 행까지 slice해서 rolling
-            window_series = df.loc[:i, 'close'].rolling(period)
+            window_series = df.loc[:i, 'Close'].rolling(period)
             mean_val = window_series.mean().iloc[-1]
             std_val = window_series.std().iloc[-1]
 
@@ -292,7 +292,7 @@ class Data_Control():
 
         return df
 
-    def LT_trand_check(self, data_1HOUR):
+    def LT_trand_check(self, df):
         """
         기존 LT_trand_check 함수를 '2번 방식' 개념으로 수정:
         이미 계산된 구간은 건너뛰고, NaN 값만 업데이트.
@@ -303,7 +303,7 @@ class Data_Control():
         컬럼이 존재한다고 가정.
         """
         # 편의상 data_1HOUR를 df로 복사
-        df = data_1HOUR.copy()
+        df = df.reset_index(drop=True)
         
         # 1) 필요한 컬럼들이 없으면 새로 만듦(처음 실행 시)
         needed_cols = [
@@ -422,7 +422,7 @@ class Data_Control():
         return df
 
 
-    def data(self,client,symbol,timeframe, limit = 220):
+    def data(self,client,symbol,timeframe, limit = 300):
         
         if timeframe == "1MINUTE":
             candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
@@ -441,6 +441,16 @@ class Data_Control():
         ])
         selected_columns = ["Open Time", "Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume"]
         data = data[selected_columns]
+        # 자료형 변환
+        data["Open"] = data["Open"].astype(float)
+        data["High"] = data["High"].astype(float)
+        data["Low"] = data["Low"].astype(float)
+        data["Close"] = data["Close"].astype(float)
+        data["Volume"] = data["Volume"].astype(float)
+        data["Taker Buy Base Asset Volume"] = data["Taker Buy Base Asset Volume"].astype(float)
+
+        # 시간 변환
+        data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')
         data["Taker Sell Base Asset Volume"] = data["Volume"] - data["Taker Buy Base Asset Volume"]
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
         data = data.sort_values(by="Open Time").reset_index(drop=True)
@@ -468,6 +478,12 @@ class Data_Control():
             # 필요한 컬럼만 선택 및 전처리
             selected_columns = ["Open Time", "Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume"]
             temp_data = temp_data[selected_columns]
+            temp_data["Open"]  = temp_data["Open"].astype(float)
+            temp_data["High"]  = temp_data["High"].astype(float)
+            temp_data["Low"]   = temp_data["Low"].astype(float)
+            temp_data["Close"] = temp_data["Close"].astype(float)
+            temp_data["Volume"] = temp_data["Volume"].astype(float)
+            temp_data["Taker Buy Base Asset Volume"]  = temp_data["Taker Buy Base Asset Volume"].astype(float)
             temp_data["Taker Sell Base Asset Volume"] = temp_data["Volume"] - temp_data["Taker Buy Base Asset Volume"]
             temp_data["Open Time"] = pd.to_datetime(temp_data["Open Time"], unit='ms')
             
@@ -475,8 +491,8 @@ class Data_Control():
             combined_data = pd.concat([existing_data, temp_data]).drop_duplicates(subset="Open Time", keep="last")
             combined_data = combined_data.sort_values(by="Open Time").reset_index(drop=True)
 
-            if len(combined_data) > 120:
-                combined_data = combined_data.iloc[-120:].reset_index(drop=True)
+            if len(combined_data) > 140:
+                combined_data = combined_data.iloc[-140:].reset_index(drop=True)
 
             return combined_data
             

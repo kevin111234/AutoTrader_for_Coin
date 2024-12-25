@@ -1,9 +1,10 @@
 import os
-import dotenv
+from dotenv import load_dotenv
 
 class Config():
     def __init__(self):
         print("환경변수 로드 중...")
+        load_dotenv()
         self.binance_access_key = os.getenv("BINANCE_ACCESS_KEY")
         self.binance_secret_key = os.getenv("BINANCE_SECRET_KEY")
         self.slack_api_key = os.getenv("SLACK_API_KEY")
@@ -18,7 +19,7 @@ class Config():
 
         print("환경변수 로드 완료")
         
-        self.verify(self)
+        self.verify()
 
     def verify(self):
         print("환경변수 검증중...")

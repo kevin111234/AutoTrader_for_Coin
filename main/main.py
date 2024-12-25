@@ -1,4 +1,5 @@
 from binance.client import Client
+import time
 
 from config import Config
 from data_control import Data_Control
@@ -24,7 +25,7 @@ def main():
         tpo_data[symbol] = {}
 
         for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
-            data = data_control.data(client, symbol, timeframe, limit=230)
+            data = data_control.data(client, symbol, timeframe, limit=300)
             data = data_control.cal_moving_average(data)
             data = data_control.cal_rsi(data)
             data = data_control.cal_bollinger_band(data)
@@ -33,8 +34,8 @@ def main():
             # 비어있는 값 제거
             data = data.dropna()
             
-            if len(data) > 120:
-                data = data.iloc[-120:].reset_index(drop=True)
+            if len(data) > 140:
+                data = data.iloc[-140:].reset_index(drop=True)
             initial_data[symbol][timeframe] = data
             profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)  # 함수 실행
             
@@ -43,6 +44,8 @@ def main():
 
             if timeframe == "1HOUR":
                 initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
+
+            print(initial_data)
 
     # 초기 자산 조회 - notifier.py
 
@@ -73,11 +76,16 @@ def main():
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
                     vp_data[symbol][timeframe] = profile_df
                     tpo_data[symbol][timeframe] = sr_levels
+                print(initial_data[symbol])
 
             # 매수/매도 판단
 
             # 주문 진행
 
+            time.sleep(3)
         except Exception as e:
             print(f"메인 루프 오류: {e}")
             # notifier.py를 통해 error 로그 전송
+
+if __name__ == "__main__":
+    main()
