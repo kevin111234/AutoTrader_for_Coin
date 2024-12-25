@@ -30,8 +30,8 @@ def main():
             # 비어있는 값 제거
             data = data.dropna()
             
-            if len(data) > 100:
-                data = data.iloc[-100:].reset_index(drop=True)
+            if len(data) > 120:
+                data = data.iloc[-120:].reset_index(drop=True)
             initial_data[symbol][timeframe] = data
             profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)  # 함수 실행
             

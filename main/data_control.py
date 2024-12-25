@@ -12,80 +12,29 @@ class Data_Control():
         return current_price
     
     def cal_moving_average(self, data, period=[20, 60, 120]):
-        """
-        이동평균선을 계산하는 함수
-        :param data: 'Close' 컬럼을 포함한 pandas DataFrame
-        :param period: 이동평균을 계산할 기간 (기본값: 20)
-        :param method: 이동평균 방식 ('SMA' 또는 'EMA')
-        :return: 이동평균선이 추가된 DataFrame
-        """
-        # 단순 이동평균(SMA)
-        for i in period:
-            data[f'SMA_{period}'] = data['Close'].rolling(window=period).mean()
 
         return data
     
-    def cal_rsi(self, data, period = 14):
-        # 'Close' 컬럼의 변화량 계산
-        delta = data['Close'].diff()
-        gains = delta.clip(lower=0)
-        losses = -delta.clip(upper=0)
-
-        # 초기 평균 계산 (첫 n개 구간)
-        avg_gain = gains[:period].mean()
-        avg_loss = losses[:period].mean()
-
-        avg_gain_list = [avg_gain]
-        avg_loss_list = [avg_loss]
-
-        # n번째 이후 값들에 대해 와일더 방식 적용
-        for i in range(period, len(gains)):
-            gain = gains.iloc[i]
-            loss = losses.iloc[i]
-
-            avg_gain = ((avg_gain * (period - 1)) + gain) / period
-            avg_loss = ((avg_loss * (period - 1)) + loss) / period
-
-            avg_gain_list.append(avg_gain)
-            avg_loss_list.append(avg_loss)
-
-        # RS 및 RSI 계산
-        rs = pd.Series(avg_gain_list, index=data.index[period-1:]) / pd.Series(avg_loss_list, index=data.index[period-1:])
-        rsi = 100 - (100 / (1 + rs))
-
-        # RSI를 원본 인덱스 전체로 확장. n-1 이전 구간은 RSI 미계산 구간이므로 NaN
-        rsi_full = pd.Series(index=data.index, dtype=float)
-        rsi_full.loc[rsi.index] = rsi
-
-        # 데이터프레임에 RSI 칼럼 추가
-        data['RSI'] = rsi_full
+    def cal_rsi(self, data, period = 14, signal_period = 14):
         
         return data
-
-    # RSI 시그널 선 계산 (기본 14일)
-    def cal_rsi_signal(self, data, signal_period=14):
-        if 'RSI' in data.columns:
-            data['RSI_Signal'] = data['RSI'].rolling(window=signal_period, min_periods=1).mean()
-        
-        return data
+    
+    def nor_rsi(self, rsi):
+        if rsi >= 50:
+            rsi = 100 - rsi
+        if rsi <= 20:
+            return 20
+        elif rsi <= 25:
+            return 25
+        elif rsi <= 30:
+            return 30
+        elif rsi <= 35:
+            return 35
+        else:
+            return 50
     
     def cal_bollinger_band(self, data, period=20, num_std=2):
-        # Simple Moving Average(단순 이동 평균)
-        sma = data['Close'].rolling(window=period).mean()
-
-        # Rolling Std Deviation(구간 표준편차)
-        std = data['Close'].rolling(window=period).std()
-
-        # Upper Band와 Lower Band 계산
-        upper_band = sma + (num_std * std)
-        lower_band = sma - (num_std * std)
-
-        # 결과 컬럼 추가
-        data['Bollinger_MA'] = sma
-        data['Bollinger_Upper'] = upper_band
-        data['Bollinger_Lower'] = lower_band
-        data['Bollinger_BW'] = upper_band-lower_band
-
+        
         return data
 
     def cal_tpo_volume_profile(self, data, 
@@ -174,94 +123,14 @@ class Data_Control():
         return profile_df, sr_levels
 
     def cal_obv(self, data, price_col='Close', volume_col='Volume'):
-        """
-        OBV(On-Balance Volume)를 계산하는 함수.
-        :param data: 'Close'와 'Volume' 컬럼을 포함한 pandas DataFrame
-        :param price_col: 종가 컬럼명(기본: 'Close')
-        :param volume_col: 거래량 컬럼명(기본: 'Volume')
-        :return: OBV 컬럼이 추가된 DataFrame
-        """
-        # Close와 Volume 시리즈를 준비
-        closes = data[price_col]
-        volumes = data[volume_col]
-
-        obv = [0]  # 첫 번째 값은 0으로 시작
-
-        for i in range(1, len(data)):
-            if closes.iloc[i] > closes.iloc[i - 1]:
-                obv.append(obv[-1] + volumes.iloc[i])
-            elif closes.iloc[i] < closes.iloc[i - 1]:
-                obv.append(obv[-1] - volumes.iloc[i])
-            else:
-                # 종가가 이전 종가와 같은 경우 변화 없음
-                obv.append(obv[-1])
-
-        data['OBV'] = obv
+        
         return data
-    
-    def nor_rsi(self, rsi):
-        if rsi >= 50:
-            rsi = 100 - rsi
-        if rsi <= 20:
-            return 20
-        elif rsi <= 25:
-            return 25
-        elif rsi <= 30:
-            return 30
-        elif rsi <= 35:
-            return 35
-        else:
-            return 50
     
     def LT_trand_check(self, data):
-        # 필요한 데이터 추출
-        data = data["1HOUR"]
-        # 1. SMA 20, 60, 120 체크
-        def check_ma_trend(row):
-            if row['SMA_20'] > row['SMA_60'] > row['SMA_120']:
-                return "UpTrend"
-            elif row['SMA_20'] < row['SMA_60'] < row['SMA_120']:
-                return "DownTrend"
-            else:
-                return "SideWays"
         
-        data['MA_Trend'] = data.apply(check_ma_trend, axis=1)
-
-        # 2. 이평선 간격 (Spread) 계산 및 추가
-        data['Spread_20_60'] = data['SMA_20'] - data['SMA_60']
-        data['Spread_60_120'] = data['SMA_60'] - data['SMA_120']
-        data['Spread_20_120'] = data['SMA_20'] - data['SMA_120']
-
-        # 3. Spread 기울기(변화율) 계산
-        data['Spread_20_60_diff'] = data['Spread_20_60'].diff(3)
-        data['Spread_60_120_diff'] = data['Spread_60_120'].diff(3)
-        data['Spread_20_120_diff'] = data['Spread_20_120'].diff(3)
-
-        # 4. OBV 계산 (OBV가 없으면 새로 계산)
-        if 'OBV' not in data.columns:
-            data['OBV'] = np.where(data['Close'] > data['Close'].shift(1), data['Volume'],
-                                  np.where(data['Close'] < data['Close'].shift(1), -data['Volume'], 0))
-            data['OBV'] = data['OBV'].cumsum()
-
-        # 5. OBV 기울기(변화율) 계산
-        data['OBV_diff'] = data['OBV'].diff(3)
-
-        # 6. 추세 판단 (강한 상승/하락, 횡보 판단)
-        def detect_trend(row):
-            if row['MA_Trend'] == "UpTrend" and row['Spread_20_60_diff'] > 0 and row['OBV_diff'] > 0:
-                return "Strong UpTrend"
-            elif row['MA_Trend'] == "DownTrend" and row['Spread_20_60_diff'] < 0 and row['OBV_diff'] < 0:
-                return "Strong DownTrend"
-            elif row['MA_Trend'] == "SideWays":
-                return "SideWays"
-            else:
-                return "Weak Trend"
-
-        data['Trend'] = data.apply(detect_trend, axis=1)
-
         return data
 
-    def data(self,client,symbol,timeframe, limit = 100):
+    def data(self,client,symbol,timeframe, limit = 220):
         
         if timeframe == "1MINUTE":
             candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
@@ -288,13 +157,12 @@ class Data_Control():
     
     def update_data(self, client, symbol, timeframe, existing_data):
         try:
-            # 최신 23개 데이터 가져오기 (가장 긴 기간인 Bollinger Band 기준)
             if timeframe == "1MINUTE":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=23)
+                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=3)
             elif timeframe == "5MINUTE":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=23)
+                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=3)
             elif timeframe == "1HOUR":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=23)
+                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=3)
             else:
                 raise ValueError("Invalid timeframe")
 
@@ -311,26 +179,12 @@ class Data_Control():
             temp_data["Taker Sell Base Asset Volume"] = temp_data["Volume"] - temp_data["Taker Buy Base Asset Volume"]
             temp_data["Open Time"] = pd.to_datetime(temp_data["Open Time"], unit='ms')
             
-            # 기술적 지표 계산
-            for period in [20, 60, 120]:
-                if f'SMA_{period}' in existing_data.columns:
-                    temp_data = self.cal_moving_average(temp_data, period, method="SMA")
-            if 'RSI' in existing_data.columns:
-                temp_data = self.cal_rsi_signal(self.cal_rsi(temp_data))
-            if 'Bollinger_MA' in existing_data.columns:
-                temp_data = self.cal_bollinger_band(temp_data)
-            if 'OBV' in existing_data.columns:
-                temp_data = self.cal_obv(temp_data)
-                
-            # 최신 3개 데이터만 추출
-            new_data = temp_data.tail(3)
-            
             ## `Open Time` 기준 병합
-            combined_data = pd.concat([existing_data, new_data]).drop_duplicates(subset="Open Time", keep="last")
+            combined_data = pd.concat([existing_data, temp_data]).drop_duplicates(subset="Open Time", keep="last")
             combined_data = combined_data.sort_values(by="Open Time").reset_index(drop=True)
 
-            if len(combined_data) > 100:
-                combined_data = combined_data.iloc[-100:].reset_index(drop=True)
+            if len(combined_data) > 120:
+                combined_data = combined_data.iloc[-120:].reset_index(drop=True)
 
             return combined_data
             
