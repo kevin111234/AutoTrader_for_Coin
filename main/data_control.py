@@ -291,10 +291,132 @@ class Data_Control():
                 df.loc[i, 'obv'] = prev_obv
 
         return df
-    
-    def LT_trand_check(self, data):
+
+    def LT_trand_check(self, data_1HOUR):
+        """
+        기존 LT_trand_check 함수를 '2번 방식' 개념으로 수정:
+        이미 계산된 구간은 건너뛰고, NaN 값만 업데이트.
+
+        data_1HOUR: 반드시
+          - 'SMA_20', 'SMA_60', 'SMA_120'
+          - 'Close', 'Volume'
+        컬럼이 존재한다고 가정.
+        """
+        # 편의상 data_1HOUR를 df로 복사
+        df = data_1HOUR.copy()
         
-        return data
+        # 1) 필요한 컬럼들이 없으면 새로 만듦(처음 실행 시)
+        needed_cols = [
+            'MA_Trend', 
+            'Spread_20_60', 'Spread_60_120', 'Spread_20_120',
+            'Spread_20_60_diff', 'Spread_60_120_diff', 'Spread_20_120_diff',
+            'OBV', 'OBV_diff',
+            'Trend'
+        ]
+        for col in needed_cols:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        # 2) MA 트렌드 판별 함수
+        def check_ma_trend(sma20, sma60, sma120):
+            if sma20 > sma60 > sma120:
+                return "UpTrend"
+            elif sma20 < sma60 < sma120:
+                return "DownTrend"
+            else:
+                return "SideWays"
+
+        # 3) 추세(Trend) 판별 함수
+        def detect_trend(ma_trend, spread_20_60_diff, obv_diff):
+            """
+            ma_trend: "UpTrend", "DownTrend", "SideWays"
+            spread_20_60_diff: Spread_20_60의 3틱 전 대비 변화량
+            obv_diff: OBV의 3틱 전 대비 변화량
+            """
+            if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0:
+                return "Strong UpTrend"
+            elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0:
+                return "Strong DownTrend"
+            elif ma_trend == "SideWays":
+                return "SideWays"
+            else:
+                return "Weak Trend"
+
+        # 4) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
+        #    이미 Trend가 채워져 있는 구간은 건너뛴다는 개념
+        last_valid = df['Trend'].last_valid_index()
+        if last_valid is None:
+            last_valid = -1  # 전부 NaN이면 -1로
+
+        # 5) for문으로 (마지막 유효인덱스 + 1) ~ 끝까지 순회
+        for i in range(last_valid + 1, len(df)):
+            # 이미 Trend가 있으면( NaN이 아니면 ) 건너뛰기
+            if pd.notna(df.loc[i, 'Trend']):
+                continue
+            
+            # =============== (1) MA_Trend 판별 ===============
+            sma20 = df.loc[i, 'SMA_20']
+            sma60 = df.loc[i, 'SMA_60']
+            sma120 = df.loc[i, 'SMA_120']
+            
+            # 값이 하나라도 NaN이면 트렌드 판단 불가
+            if pd.isna(sma20) or pd.isna(sma60) or pd.isna(sma120):
+                continue
+            
+            # MA_Trend 업데이트
+            df.loc[i, 'MA_Trend'] = check_ma_trend(sma20, sma60, sma120)
+
+            # =============== (2) Spread 계산 ===============
+            df.loc[i, 'Spread_20_60']  = sma20 - sma60
+            df.loc[i, 'Spread_60_120'] = sma60 - sma120
+            df.loc[i, 'Spread_20_120'] = sma20 - sma120
+
+            # =============== (3) Spread 기울기(3틱 전 대비 차이) ===============
+            # i-3 >= 0 일 때만 계산 가능
+            if i >= 3:
+                df.loc[i, 'Spread_20_60_diff']  = df.loc[i, 'Spread_20_60']  - df.loc[i-3, 'Spread_20_60']
+                df.loc[i, 'Spread_60_120_diff'] = df.loc[i, 'Spread_60_120'] - df.loc[i-3, 'Spread_60_120']
+                df.loc[i, 'Spread_20_120_diff'] = df.loc[i, 'Spread_20_120'] - df.loc[i-3, 'Spread_20_120']
+
+            # =============== (4) OBV 업데이트 (이미 있으면 스킵, 없으면 계산) ===============
+            # i=0인 경우엔 OBV를 초기화, i>0이면 이전 값 기반
+            if i == 0:
+                if pd.isna(df.loc[i, 'OBV']):
+                    # 첫 캔들이라면 그냥 현재 volume으로 시작하거나 0으로 시작 가능
+                    df.loc[i, 'OBV'] = df.loc[i, 'Volume']
+            else:
+                if pd.isna(df.loc[i, 'OBV']):
+                    prev_price = df.loc[i-1, 'Close']
+                    curr_price = df.loc[i, 'Close']
+                    prev_obv = df.loc[i-1, 'OBV'] if not pd.isna(df.loc[i-1, 'OBV']) else 0
+                    curr_vol = df.loc[i, 'Volume']
+                    
+                    if curr_price > prev_price:
+                        df.loc[i, 'OBV'] = prev_obv + curr_vol
+                    elif curr_price < prev_price:
+                        df.loc[i, 'OBV'] = prev_obv - curr_vol
+                    else:
+                        df.loc[i, 'OBV'] = prev_obv
+            
+            # =============== (5) OBV 기울기(3틱 전 대비 차이) ===============
+            if i >= 3 and not pd.isna(df.loc[i, 'OBV']) and not pd.isna(df.loc[i-3, 'OBV']):
+                df.loc[i, 'OBV_diff'] = df.loc[i, 'OBV'] - df.loc[i-3, 'OBV']
+
+            # =============== (6) 최종 Trend 판별 ===============
+            # MA_Trend, Spread_20_60_diff, OBV_diff 중 하나라도 NaN이면 판별 불가
+            ma_trend_val = df.loc[i, 'MA_Trend']
+            spread_20_60_diff_val = df.loc[i, 'Spread_20_60_diff']
+            obv_diff_val = df.loc[i, 'OBV_diff']
+
+            if pd.isna(ma_trend_val) or pd.isna(spread_20_60_diff_val) or pd.isna(obv_diff_val):
+                # 아직 3틱 안 됐거나, 필요한 값이 NaN이면 Trend를 구할 수 없음
+                continue
+            
+            # Trend 업데이트
+            df.loc[i, 'Trend'] = detect_trend(ma_trend_val, spread_20_60_diff_val, obv_diff_val)
+
+        return df
+
 
     def data(self,client,symbol,timeframe, limit = 220):
         
