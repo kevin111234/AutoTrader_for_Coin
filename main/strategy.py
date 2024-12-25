@@ -3,6 +3,9 @@ from config import Config
 class Strategy():
     def __init__(self):
         self.position_check = {}
+
+    def trand_check(self):
+        pass
     
     def position_tracker(self):
         print("포지션 추적용 함수 실행")
