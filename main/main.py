@@ -38,6 +38,9 @@ def main():
             vp_data[symbol][timeframe] = profile_df
             tpo_data[symbol][timeframe] = sr_levels
 
+            if timeframe == "1HOUR":
+                initial_data[symbol] = data_control.LT_trand_check(initial_data[symbol])
+
     # 초기 자산 조회 - notifier.py
 
     # 반복문 시작
@@ -53,6 +56,8 @@ def main():
                     initial_data[symbol][timeframe] = data_control.update_data(
                         client, symbol, timeframe, initial_data[symbol][timeframe]
                     )
+                    if timeframe == "1HOUR":
+                        updated_data = data_control.LT_trand_check(updated_data)
                     
                     # TPO/VP 데이터 업데이트
                     data = initial_data[symbol][timeframe]

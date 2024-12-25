@@ -212,6 +212,54 @@ class Data_Control():
             return 35
         else:
             return 50
+    
+    def LT_trand_check(self, data):
+        # 필요한 데이터 추출
+        data = data["1HOUR"]
+        # 1. SMA 20, 60, 120 체크
+        def check_ma_trend(row):
+            if row['SMA_20'] > row['SMA_60'] > row['SMA_120']:
+                return "UpTrend"
+            elif row['SMA_20'] < row['SMA_60'] < row['SMA_120']:
+                return "DownTrend"
+            else:
+                return "SideWays"
+        
+        data['MA_Trend'] = data.apply(check_ma_trend, axis=1)
+
+        # 2. 이평선 간격 (Spread) 계산 및 추가
+        data['Spread_20_60'] = data['SMA_20'] - data['SMA_60']
+        data['Spread_60_120'] = data['SMA_60'] - data['SMA_120']
+        data['Spread_20_120'] = data['SMA_20'] - data['SMA_120']
+
+        # 3. Spread 기울기(변화율) 계산
+        data['Spread_20_60_diff'] = data['Spread_20_60'].diff(3)
+        data['Spread_60_120_diff'] = data['Spread_60_120'].diff(3)
+        data['Spread_20_120_diff'] = data['Spread_20_120'].diff(3)
+
+        # 4. OBV 계산 (OBV가 없으면 새로 계산)
+        if 'OBV' not in data.columns:
+            data['OBV'] = np.where(data['Close'] > data['Close'].shift(1), data['Volume'],
+                                  np.where(data['Close'] < data['Close'].shift(1), -data['Volume'], 0))
+            data['OBV'] = data['OBV'].cumsum()
+
+        # 5. OBV 기울기(변화율) 계산
+        data['OBV_diff'] = data['OBV'].diff(3)
+
+        # 6. 추세 판단 (강한 상승/하락, 횡보 판단)
+        def detect_trend(row):
+            if row['MA_Trend'] == "UpTrend" and row['Spread_20_60_diff'] > 0 and row['OBV_diff'] > 0:
+                return "Strong UpTrend"
+            elif row['MA_Trend'] == "DownTrend" and row['Spread_20_60_diff'] < 0 and row['OBV_diff'] < 0:
+                return "Strong DownTrend"
+            elif row['MA_Trend'] == "SideWays":
+                return "SideWays"
+            else:
+                return "Weak Trend"
+
+        data['Trend'] = data.apply(detect_trend, axis=1)
+
+        return data
 
     def data(self,client,symbol,timeframe, limit = 100):
         
