@@ -25,7 +25,10 @@ def main():
 
         for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
             data = data_control.data(client, symbol, timeframe, limit=230)
-            data = data_control.cal_rsi_signal(data_control.cal_rsi(data_control.cal_bollinger_band(data_control.cal_obv(data_control.cal_moving_average(data)))))
+            data = data_control.cal_moving_average(data)
+            data = data_control.cal_rsi(data)
+            data = data_control.cal_bollinger_band(data)
+            data = data_control.cal_obv(data)
 
             # 비어있는 값 제거
             data = data.dropna()
@@ -39,7 +42,7 @@ def main():
             tpo_data[symbol][timeframe] = sr_levels
 
             if timeframe == "1HOUR":
-                initial_data[symbol] = data_control.LT_trand_check(initial_data[symbol])
+                initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
     # 초기 자산 조회 - notifier.py
 
@@ -56,10 +59,16 @@ def main():
                     initial_data[symbol][timeframe] = data_control.update_data(
                         client, symbol, timeframe, initial_data[symbol][timeframe]
                     )
+                    updated_data = initial_data[symbol][timeframe]
+                    updated_data = data_control.cal_moving_average(updated_data)
+                    updated_data = data_control.cal_rsi(updated_data)
+                    updated_data = data_control.cal_bollinger_band(updated_data)
+                    updated_data = data_control.cal_obv(updated_data)
                     if timeframe == "1HOUR":
                         updated_data = data_control.LT_trand_check(updated_data)
-                    
+
                     # TPO/VP 데이터 업데이트
+                    initial_data[symbol][timeframe] = updated_data
                     data = initial_data[symbol][timeframe]
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
                     vp_data[symbol][timeframe] = profile_df
