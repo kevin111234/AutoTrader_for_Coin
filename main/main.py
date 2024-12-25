@@ -45,8 +45,6 @@ def main():
             if timeframe == "1HOUR":
                 initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
-            print(initial_data)
-
     # 초기 자산 조회 - notifier.py
 
     # 반복문 시작
@@ -76,7 +74,6 @@ def main():
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
                     vp_data[symbol][timeframe] = profile_df
                     tpo_data[symbol][timeframe] = sr_levels
-                print(initial_data[symbol])
 
             # 매수/매도 판단
 
