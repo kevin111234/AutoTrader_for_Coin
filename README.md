@@ -8,6 +8,7 @@
 4. SLACK_ASSET_CHANNEL_ID = 자산 정보를 전송할 슬랙 채널 ID
 5. SLACK_TRADE_CHANNEL_ID = 매매 정보를 전송할 슬랙 채널 ID
 6. SLACK_ERROR_CHANNEL_ID = 에러 정보를 전송할 슬랙 채널 ID
+API 설정에 대한 정보는 [[https://woghd-dev.tistory.com/19](https://woghd-dev.tistory.com/19)]참고
 
 7. SEED_MONEY = 시드머니(수익률 계산용)
 8. COIN_TICKERS = 매매하고자 하는 코인 티커(ex- USDT-BTC = 테더로 비트코인을 사겠다)(공백으로 구분)
