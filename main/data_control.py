@@ -307,10 +307,7 @@ class Data_Control():
         
         # 1) 필요한 컬럼들이 없으면 새로 만듦(처음 실행 시)
         needed_cols = [
-            'MA_Trend', 
             'Spread_20_60', 'Spread_60_120', 'Spread_20_120',
-            'Spread_20_60_diff', 'Spread_60_120_diff', 'Spread_20_120_diff',
-            'OBV', 'OBV_diff',
             'Trend',
             'Spread_20_60_MA', 'Spread_60_120_MA', 'Spread_20_120_MA'
         ]
@@ -372,7 +369,7 @@ class Data_Control():
                 continue
             
             # MA_Trend 업데이트
-            df.loc[i, 'MA_Trend'] = check_ma_trend(sma20, sma60, sma120)
+            MA_Trend = check_ma_trend(sma20, sma60, sma120)
 
             # =============== (2) Spread 계산 ===============
             df.loc[i, 'Spread_20_60']  = sma20 - sma60
@@ -392,46 +389,26 @@ class Data_Control():
             # =============== (3) Spread 기울기(3틱 전 대비 차이) ===============
             # i-3 >= 0 일 때만 계산 가능
             if i >= 3:
-                df.loc[i, 'Spread_20_60_diff']  = df.loc[i, 'Spread_20_60']  - df.loc[i-3, 'Spread_20_60']
-                df.loc[i, 'Spread_60_120_diff'] = df.loc[i, 'Spread_60_120'] - df.loc[i-3, 'Spread_60_120']
-                df.loc[i, 'Spread_20_120_diff'] = df.loc[i, 'Spread_20_120'] - df.loc[i-3, 'Spread_20_120']
-
-            # =============== (4) OBV 업데이트 (이미 있으면 스킵, 없으면 계산) ===============
-            # i=0인 경우엔 OBV를 초기화, i>0이면 이전 값 기반
-            if i == 0:
-                if pd.isna(df.loc[i, 'OBV']):
-                    # 첫 캔들이라면 그냥 현재 volume으로 시작하거나 0으로 시작 가능
-                    df.loc[i, 'OBV'] = df.loc[i, 'Volume']
+                Spread_20_60_diff  = df.loc[i, 'Spread_20_60']  - df.loc[i-3, 'Spread_20_60']
+                # Spread_60_120_diff = df.loc[i, 'Spread_60_120'] - df.loc[i-3, 'Spread_60_120']
+                # Spread_20_120_diff = df.loc[i, 'Spread_20_120'] - df.loc[i-3, 'Spread_20_120']
             else:
-                if pd.isna(df.loc[i, 'OBV']):
-                    prev_price = df.loc[i-1, 'Close']
-                    curr_price = df.loc[i, 'Close']
-                    prev_obv = df.loc[i-1, 'OBV'] if not pd.isna(df.loc[i-1, 'OBV']) else 0
-                    curr_vol = df.loc[i, 'Volume']
-                    
-                    if curr_price > prev_price:
-                        df.loc[i, 'OBV'] = prev_obv + curr_vol
-                    elif curr_price < prev_price:
-                        df.loc[i, 'OBV'] = prev_obv - curr_vol
-                    else:
-                        df.loc[i, 'OBV'] = prev_obv
+                Spread_20_60_diff = np.nan
             
             # =============== (5) OBV 기울기(3틱 전 대비 차이) ===============
-            if i >= 3 and not pd.isna(df.loc[i, 'OBV']) and not pd.isna(df.loc[i-3, 'OBV']):
-                df.loc[i, 'OBV_diff'] = df.loc[i, 'OBV'] - df.loc[i-3, 'OBV']
+            if i >= 3 and not pd.isna(df.loc[i, 'obv']) and not pd.isna(df.loc[i-3, 'obv']):
+                OBV_diff = df.loc[i, 'obv'] - df.loc[i-3, 'obv']
+            else:
+                OBV_diff = np.nan
 
             # =============== (6) 최종 Trend 판별 ===============
             # MA_Trend, Spread_20_60_diff, OBV_diff 중 하나라도 NaN이면 판별 불가
-            ma_trend_val = df.loc[i, 'MA_Trend']
-            spread_20_60_diff_val = df.loc[i, 'Spread_20_60_diff']
-            obv_diff_val = df.loc[i, 'OBV_diff']
-
-            if pd.isna(ma_trend_val) or pd.isna(spread_20_60_diff_val) or pd.isna(obv_diff_val):
+            if pd.isna(MA_Trend) or pd.isna(Spread_20_60_diff) or pd.isna(OBV_diff):
                 # 아직 3틱 안 됐거나, 필요한 값이 NaN이면 Trend를 구할 수 없음
                 continue
             
             # Trend 업데이트
-            df.loc[i, 'Trend'] = detect_trend(ma_trend_val, spread_20_60_diff_val, obv_diff_val, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
+            df.loc[i, 'Trend'] = detect_trend(MA_Trend, Spread_20_60_diff, OBV_diff, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
 
         return df
 

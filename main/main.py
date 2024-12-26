@@ -42,7 +42,7 @@ def main():
             vp_data[symbol][timeframe] = profile_df
             tpo_data[symbol][timeframe] = sr_levels
 
-            if timeframe == "1HOUR":
+            if timeframe == "1HOUR" or timeframe == "5MINUTE":
                 initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
     # 초기 자산 조회 - notifier.py
@@ -65,7 +65,7 @@ def main():
                     updated_data = data_control.cal_rsi(updated_data)
                     updated_data = data_control.cal_bollinger_band(updated_data)
                     updated_data = data_control.cal_obv(updated_data)
-                    if timeframe == "1HOUR":
+                    if timeframe == "1HOUR" or timeframe == "5MINUTE":
                         updated_data = data_control.LT_trand_check(updated_data)
 
                     # TPO/VP 데이터 업데이트
@@ -76,6 +76,7 @@ def main():
                     tpo_data[symbol][timeframe] = sr_levels
 
             # 매수/매도 판단
+            print(initial_data[symbol])
 
             # 주문 진행
 
