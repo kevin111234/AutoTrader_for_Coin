@@ -2,6 +2,17 @@
 
 --------------------------------------------
 # 환경변수 설정
+1. BINANCE_ACCESS_KEY = 바이낸스 api key
+2. BINANCE_SECRET_KEY = 바이낸스 secret key
+3. SLACK_API_KEY = 슬랙 봇 api token
+4. SLACK_ASSET_CHANNEL_ID = 자산 정보를 전송할 슬랙 채널 ID
+5. SLACK_TRADE_CHANNEL_ID = 매매 정보를 전송할 슬랙 채널 ID
+6. SLACK_ERROR_CHANNEL_ID = 에러 정보를 전송할 슬랙 채널 ID
+
+7. SEED_MONEY = 시드머니(수익률 계산용)
+8. COIN_TICKERS = 매매하고자 하는 코인 티커(ex- USDT-BTC = 테더로 비트코인을 사겠다)(공백으로 구분)
+9. STO_FUT_RATE = 현물/선물 거래 비율(공백으로 구분)
+10. LEVERAGE_RATE = 레버리지 비율(숫자만 작성)
 
 # 디렉토리 구조
   
