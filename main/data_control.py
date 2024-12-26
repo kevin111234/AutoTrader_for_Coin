@@ -328,16 +328,21 @@ class Data_Control():
                 return "SideWays"
 
         # 3) 추세(Trend) 판별 함수
-        def detect_trend(ma_trend, spread_20_60_diff, obv_diff):
-            if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0:
+        def detect_trend(ma_trend, spread_20_60_diff, obv_diff, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold):
+            """
+            ma_trend: "UpTrend", "DownTrend", "SideWays"
+            spread_20_60_diff: Spread_20_60의 3틱 전 대비 변화량
+            obv_diff: OBV의 3틱 전 대비 변화량
+            """
+            if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0 and Price_vs_SMA20_1 and Spread_20_60_vs_Threshold:
                 return "Level 3 UpTrend"
-            elif ma_trend == "UpTrend" and (spread_20_60_diff > 0 or obv_diff > 0):
+            elif ma_trend == "UpTrend" and (spread_20_60_diff > 0 or obv_diff > 0) and (Price_vs_SMA20_1 or Spread_20_60_vs_Threshold):
                 return "Level 2 UpTrend"
             elif ma_trend == "UpTrend":
                 return "Level 1 UpTrend"
-            elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0:
+            elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0 and Price_vs_SMA20_2 and not Spread_20_60_vs_Threshold:
                 return "Level 3 DownTrend"
-            elif ma_trend == "DownTrend" and (spread_20_60_diff < 0 or obv_diff < 0):
+            elif ma_trend == "DownTrend" and (spread_20_60_diff < 0 or obv_diff < 0) and (Price_vs_SMA20_2 or not Spread_20_60_vs_Threshold):
                 return "Level 2 DownTrend"
             elif ma_trend == "DownTrend":
                 return "Level 1 DownTrend"
@@ -360,6 +365,7 @@ class Data_Control():
             sma20 = df.loc[i, 'SMA_20']
             sma60 = df.loc[i, 'SMA_60']
             sma120 = df.loc[i, 'SMA_120']
+            close_price = df.loc[i, 'Close']
             
             # 값이 하나라도 NaN이면 트렌드 판단 불가
             if pd.isna(sma20) or pd.isna(sma60) or pd.isna(sma120):
@@ -375,6 +381,13 @@ class Data_Control():
             df.loc[i, 'Spread_20_60_MA'] = df.loc[i-19:i, 'Spread_20_60'].mean()
             df.loc[i, 'Spread_60_120_MA'] = df.loc[i-19:i, 'Spread_60_120'].mean()
             df.loc[i, 'Spread_20_120_MA'] = df.loc[i-19:i, 'Spread_20_120'].mean()
+
+            # 가격과 20일 이동평균선 비교
+            Price_vs_SMA20_1 = close_price > sma20*1.25 
+            Price_vs_SMA20_2 = close_price < sma20*0.75 
+
+            # 20일과 60일 이동평균선의 편차 확인
+            Spread_20_60_vs_Threshold = df.loc[i, 'Spread_20_60'] > df.loc[i, 'Spread_20_60_MA']
 
             # =============== (3) Spread 기울기(3틱 전 대비 차이) ===============
             # i-3 >= 0 일 때만 계산 가능
@@ -418,7 +431,7 @@ class Data_Control():
                 continue
             
             # Trend 업데이트
-            df.loc[i, 'Trend'] = detect_trend(ma_trend_val, spread_20_60_diff_val, obv_diff_val)
+            df.loc[i, 'Trend'] = detect_trend(ma_trend_val, spread_20_60_diff_val, obv_diff_val, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
 
         return df
 
