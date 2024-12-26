@@ -28,8 +28,25 @@
 | **Bollinger_Lower**              | 볼린저밴드 하단                                               | float64        |
 | **Bollinger_BW**                 | 볼린저밴드 폭 (Upper - Lower)                                | float64        |
 | **OBV**                          | 온밸런스 볼륨 (On-Balance Volume)                            | float64        |
+| **Spread_20_60**                 | 20일 SMA와 60일 SMA 간의 차이                               | float64        |
+| **Spread_60_120**                | 60일 SMA와 120일 SMA 간의 차이                              | float64        |
+| **Spread_20_120**                | 20일 SMA와 120일 SMA 간의 차이                              | float64        |
+| **Spread_20_60_MA**              | Spread_20_60의 이동평균                                    | float64        |
+| **Spread_60_120_MA**             | Spread_60_120의 이동평균                                   | float64        |
+| **Spread_20_120_MA**             | Spread_20_120의 이동평균                                   | float64        |
+| **Trend**                        | 추세 상태 (7단계: -3 ~ 3)                                  | int            |
 
 - **단위:** `Open Time`은 밀리초(ms) 단위로 제공되며, 데이터프레임에서 `pd.to_datetime()`을 통해 datetime 형식으로 변환됩니다.  
+
+### **Trend 칼럼 단계별 설명:**
+- **-3**: 강한 하락 추세  
+- **-2**: 중간 하락 추세  
+- **-1**: 약한 하락 추세  
+- **0**: 횡보 추세  
+- **1**: 약한 상승 추세  
+- **2**: 중간 상승 추세  
+- **3**: 강한 상승 추세  
+
 ---
   
 ### **볼륨 프로파일 및 TPO 프로파일 (cal_tpo_volume_profile)**  
