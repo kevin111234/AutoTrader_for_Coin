@@ -332,19 +332,19 @@ class Data_Control():
             obv_diff: OBV의 3틱 전 대비 변화량
             """
             if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0 and Price_vs_SMA20_1 and Spread_20_60_vs_Threshold:
-                return "Level 3 UpTrend"
+                return 3 #"Level 3 UpTrend"
             elif ma_trend == "UpTrend" and (spread_20_60_diff > 0 or obv_diff > 0) and (Price_vs_SMA20_1 or Spread_20_60_vs_Threshold):
-                return "Level 2 UpTrend"
+                return 2 #"Level 2 UpTrend"
             elif ma_trend == "UpTrend":
-                return "Level 1 UpTrend"
+                return 1 #"Level 1 UpTrend"
             elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0 and Price_vs_SMA20_2 and not Spread_20_60_vs_Threshold:
-                return "Level 3 DownTrend"
+                return -3 #"Level 3 DownTrend"
             elif ma_trend == "DownTrend" and (spread_20_60_diff < 0 or obv_diff < 0) and (Price_vs_SMA20_2 or not Spread_20_60_vs_Threshold):
-                return "Level 2 DownTrend"
+                return -2 #"Level 2 DownTrend"
             elif ma_trend == "DownTrend":
-                return "Level 1 DownTrend"
+                return -1 #"Level 1 DownTrend"
             else:
-                return "SideWays"
+                return 0 #"SideWays"
 
         # 4) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
         #    이미 Trend가 채워져 있는 구간은 건너뛴다는 개념
