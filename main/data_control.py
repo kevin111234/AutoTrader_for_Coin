@@ -329,19 +329,20 @@ class Data_Control():
 
         # 3) 추세(Trend) 판별 함수
         def detect_trend(ma_trend, spread_20_60_diff, obv_diff):
-            """
-            ma_trend: "UpTrend", "DownTrend", "SideWays"
-            spread_20_60_diff: Spread_20_60의 3틱 전 대비 변화량
-            obv_diff: OBV의 3틱 전 대비 변화량
-            """
             if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0:
-                return "Strong UpTrend"
+                return "Level 3 UpTrend"
+            elif ma_trend == "UpTrend" and (spread_20_60_diff > 0 or obv_diff > 0):
+                return "Level 2 UpTrend"
+            elif ma_trend == "UpTrend":
+                return "Level 1 UpTrend"
             elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0:
-                return "Strong DownTrend"
-            elif ma_trend == "SideWays":
-                return "SideWays"
+                return "Level 3 DownTrend"
+            elif ma_trend == "DownTrend" and (spread_20_60_diff < 0 or obv_diff < 0):
+                return "Level 2 DownTrend"
+            elif ma_trend == "DownTrend":
+                return "Level 1 DownTrend"
             else:
-                return "Weak Trend"
+                return "SideWays"
 
         # 4) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
         #    이미 Trend가 채워져 있는 구간은 건너뛴다는 개념
