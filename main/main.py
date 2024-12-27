@@ -3,6 +3,7 @@ import time
 
 from config import Config
 from data_control import Data_Control
+from notifier import Notifier
 
 def main():
     print("투자 프로그램을 시작합니다.")
@@ -12,6 +13,7 @@ def main():
     ticker_list = config.coin_tickers.split(" ")
     client = Client(config.binance_access_key, config.binance_secret_key)
     data_control = Data_Control()
+    notifier = Notifier()
 
     # 초기 데이터 조회 - data_control.py
     initial_data = {}
