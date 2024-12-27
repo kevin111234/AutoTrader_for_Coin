@@ -7,9 +7,53 @@ class Data_Control():
         pass
 
     def get_current_price(self,client,symbol):
-        price = client.get_symbol_ticker(symbol)
-        current_price = price["price"]
-        return current_price
+        """
+        "symbol": symbol,
+        "current_price": current_price,
+        "average_buy_price": avg_buy_price,
+        "profit_rate": profit_rate
+        """
+        try:
+            # 현재 가격 조회
+            ticker = client.get_symbol_ticker(symbol=symbol)
+            current_price = float(ticker['price'])
+            
+            # 평균 매수 가격 및 수량 계산
+            trades = client.get_my_trades(symbol=symbol)
+            total_cost = 0
+            total_quantity = 0
+
+            for trade in trades:
+                qty = float(trade['qty'])
+                price = float(trade['price'])
+                commission = float(trade['commission'])
+                
+                total_cost += (qty * price) + commission
+                total_quantity += qty
+
+            # 평균 매수 가격 계산
+            avg_buy_price = total_cost / total_quantity if total_quantity > 0 else 0
+
+            # 수익률 계산
+            profit_rate = 0
+            if avg_buy_price > 0:
+                profit_rate = ((current_price - avg_buy_price) / avg_buy_price) * 100
+
+            # 결과 출력
+            print(f"{symbol} 현재 가격: {current_price:.2f} USDT")
+            print(f"{symbol} 평균 매수 가격: {avg_buy_price:.2f} USDT")
+            print(f"{symbol} 수익률: {profit_rate:.2f}%")
+
+            return {
+                "symbol": symbol,
+                "current_price": current_price, # 현재 가격
+                "average_buy_price": avg_buy_price, # 평균 매수 가격
+                "profit_rate": profit_rate # 수익률
+            }
+
+        except Exception as e:
+            print(f"{symbol} 계산 중 오류 발생: {e}")
+            return None
     
     def cal_moving_average(self, df, period=[20, 60, 120]):
         """
