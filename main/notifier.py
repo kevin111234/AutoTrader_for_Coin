@@ -8,12 +8,12 @@ class Notifier():
         self.target_coins = ["USDT", ]
         coins = config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
         for i in range(len(coins)):
-            self.target_coins.append(coins[i].split("-")[1])
+            self.target_coins.append(coins[i])
 
     def get_asset_info(self, symbol):
         """반환 형태 예시
         {
-            "USDT-USDT": {
+            "USDT": {
                 "free": 1000.0,
                 "locked": 0.0,
                 "total_quantity": 1000.0,
@@ -21,7 +21,7 @@ class Notifier():
                 "current_price": 0,
                 "profit_rate": 0
             },
-            "USDT-ETH": {
+            "ETH": {
                 "free": 1.2,
                 "locked": 0,
                 "total_quantity": 1.2,
@@ -47,25 +47,22 @@ class Notifier():
 
                 # USDT는 보유 수량만 저장
                 if asset == "USDT":
-                    self.asset_info[f"USDT-{asset}"] = {
+                    self.asset_info[asset] = {
                         "free": free,
                         "locked": locked,
                         "total_quantity": total_quantity,
                         "average_buy_price": 0,
                         "current_price": 0,
-                        "profit_rate": 0
+                        "profit_rate": 0,
                     }
                     continue
 
-                # 3. 코인 심볼 형식 변환 (BTC -> USDT-BTC)
-                symbol = f"USDT-{asset}"
-
                 # 4. 현재 가격 조회
-                current_price = float(self.client.get_symbol_ticker(symbol=f"{asset}USDT")['price'])
+                current_price = float(self.client.get_symbol_ticker(f"{asset}USDT")['price'])
 
                 # 5. 보유 수량이 0인 경우 (현재 가격 제외하고 모두 0으로 저장)
                 if total_quantity == 0:
-                    self.asset_info[symbol] = {
+                    self.asset_info[asset] = {
                         "free": 0,
                         "locked": 0,
                         "total_quantity": 0,
@@ -76,7 +73,7 @@ class Notifier():
                     continue
 
                 # 6. 평균 매수 가격 계산
-                trades = self.client.get_my_trades(symbol=f"{asset}USDT")
+                trades = self.client.get_my_trades(f"{asset}USDT")
                 total_cost = 0
                 total_trade_quantity = 0
 
@@ -98,18 +95,17 @@ class Notifier():
                 # 8. 결과 저장
                 self.asset_info[symbol] = {
                     "free": free, # 거래가능 수량
-                    "locked": locked, # 거래 진행중인 수량량
+                    "locked": locked, # 거래 진행중인 수량
                     "total_quantity": total_quantity, # 보유량
                     "average_buy_price": avg_buy_price, # 평균 매수가
                     "current_price": current_price, # 현재가격
-                    "profit_rate": profit_rate # 수익률
+                    "profit_rate": profit_rate, # 수익률
                 }
+
+                self.limit_amount = float(self.asset_info["USDT"]["free"])/(len(self.target_coins)-1)
 
         except Exception as e:
             print(f"자산 정보 및 수익률 계산 중 오류 발생: {e}")
-
-    def get_limit_amount():
-        print("투자 한도 불러오기 함수를 실행합니다.")
 
     def send_slack_message():
         print("slack 메시지 전송 함수를 실행합니다.")

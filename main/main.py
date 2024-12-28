@@ -19,9 +19,7 @@ def main():
     initial_data = {}
     vp_data = {}
     tpo_data = {}
-    for ticker in ticker_list:
-        ticker = ticker.split("-")
-        symbol = str(ticker[1]) + str(ticker[0])
+    for symbol in ticker_list:
         initial_data[symbol] = {}
         vp_data[symbol] = {}
         tpo_data[symbol] = {}
