@@ -173,14 +173,14 @@ class Notifier():
             print(error_msg)
             return {}
 
-    def send_slack_message():
+    def send_slack_message(self):
         print("slack 메시지 전송 함수를 실행합니다.")
 
-    def send_asset_info():
+    def send_asset_info(self):
         print("자산 정보 전송 함수를 실행합니다.")
 
-    def send_trade_info():
+    def send_trade_info(self):
         print("거래 정보 전송 함수를 실행합니다.")
 
-    def send_error_info():
+    def send_error_info(self):
         print("에러 정보 전송 함수를 실행합니다.")
