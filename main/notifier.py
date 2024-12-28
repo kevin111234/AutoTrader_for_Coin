@@ -102,10 +102,76 @@ class Notifier():
                     "profit_rate": profit_rate, # 수익률
                 }
 
-                self.limit_amount = float(self.asset_info["USDT"]["free"])/(len(self.target_coins)-1)
-
         except Exception as e:
             print(f"자산 정보 및 수익률 계산 중 오류 발생: {e}")
+    
+    def get_limit_amount(self):
+        try:
+            # 1. USDT 잔액 조회
+            usdt_balance = float(self.asset_info.get("USDT", {}).get("total_quantity", 0))
+
+            # 2. 코인별 현재가 및 자산 가치 계산
+            coin_values = {}
+            total_asset = usdt_balance
+
+            for symbol in self.target_coins:
+                # USDT는 제외하고 다른 코인만 처리
+                if symbol == "USDT":
+                    continue
+
+                # 코인별 현재 가격 및 보유량 조회
+                coin_info = self.asset_info.get(symbol, {})
+                current_price = float(coin_info.get("current_price", 0))
+                total_amount = float(coin_info.get("total_quantity", 0))
+
+                # 코인의 총 가치(USDT 환산) 계산
+                coin_value = total_amount * current_price
+                coin_values[symbol] = coin_value
+                total_asset += coin_value
+
+            # 3. 코인 개수 및 자산 균등 배분 금액 계산
+            coin_count = len(self.target_coins) - 1  # USDT 제외
+            if coin_count == 0:
+                raise ValueError("코인 개수가 0입니다")
+
+            target_amount_per_coin = total_asset / coin_count
+
+            # 4. 매수 가능 금액 계산
+            limit_amounts = {}
+            negative_sum = 0
+            negative_count = 0
+
+            for symbol in self.target_coins:
+                if symbol == "USDT":
+                    continue
+
+                # 목표 금액에서 보유 자산 가치 차감
+                limit_amount = target_amount_per_coin - coin_values.get(symbol, 0)
+
+                # 초과 보유 시 0으로 설정하고, 초과분을 누적
+                if limit_amount < 0:
+                    negative_sum += abs(limit_amount)
+                    negative_count += 1
+                    limit_amounts[symbol] = 0
+                else:
+                    limit_amounts[symbol] = limit_amount
+
+            # 5. 초과 자산을 다른 코인들에게 분배
+            if negative_count > 0 and coin_count > negative_count:
+                additional_reduction = negative_sum / (coin_count - negative_count)
+                for symbol in self.target_coins:
+                    if symbol == "USDT":
+                        continue
+                    if limit_amounts[symbol] > 0:
+                        limit_amounts[symbol] -= additional_reduction
+
+            return limit_amounts
+
+        except Exception as e:
+            error_msg = f"주문 가능 금액 조회 중 오류 발생: {str(e)}"
+            self.send_slack_message(self.config.slack_error_channel, error_msg)
+            print(error_msg)
+            return {}
 
     def send_slack_message():
         print("slack 메시지 전송 함수를 실행합니다.")
