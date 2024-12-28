@@ -39,6 +39,8 @@ class Notifier():
             # 2. 각 자산별 평균 매수 가격 및 수익률 계산
             for balance in balances:
                 asset = balance['asset']
+                if asset not in self.target_coins:
+                    continue  # target_coins에 없는 자산은 건너뛰기
                 free = float(balance['free'])
                 locked = float(balance['locked'])
                 total_quantity = free + locked
