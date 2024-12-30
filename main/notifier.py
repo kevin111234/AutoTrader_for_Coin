@@ -4,12 +4,12 @@ from slack_sdk import WebClient
 
 class Notifier():
     def __init__(self):
-        config = Config()
-        self.client = Client(config.binance_access_key, config.binance_secret_key)
+        self.config = Config()
+        self.client = Client(self.config.binance_access_key, self.config.binance_secret_key)
         self.slack = WebClient(token=self.config.slack_api_token)
         self.asset_info = {}
         self.target_coins = ["USDT", ]
-        coins = config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
+        coins = self.config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
         for i in range(len(coins)):
             self.target_coins.append(coins[i])
 
@@ -172,7 +172,7 @@ class Notifier():
 
         except Exception as e:
             error_msg = f"주문 가능 금액 조회 중 오류 발생: {str(e)}"
-            self.send_slack_message(self.config.slack_error_channel, error_msg)
+            self.send_slack_message(self.config.slack_error_channel_id, error_msg)
             print(error_msg)
             return {}
 
@@ -182,8 +182,55 @@ class Notifier():
         except Exception as e:
             print(f"Error sending message: {e}")
 
-    def send_asset_info(self):
-        print("자산 정보 전송 함수를 실행합니다.")
+    # 자산 정보 전송 함수
+    def send_asset_info(self, limit_amount, position_tracker=""):
+        # USDT 잔액 및 총 자산 계산
+        usdt_balance = self.asset_info.get("USDT", {}).get("total_quantity", 0)
+        total_asset = usdt_balance
+
+        # 메시지 초기 구성
+        message = f"""
+📊 자산 현황 보고
+──────────────
+💰 보유 USDT: {usdt_balance:,.2f} USDT
+──────────────
+{position_tracker}
+──────────────
+"""
+
+        # 각 코인별 평가 금액 및 메시지 생성
+        for symbol, info in self.asset_info.items():
+            if symbol == "USDT":
+                continue  # USDT는 이미 상단에 출력했으므로 제외
+
+            # 평가 금액 및 총 자산 합산
+            coin_value = info['total_quantity'] * info['current_price']
+            total_asset += coin_value
+
+            # 메시지에 코인 정보 추가
+            message += f"""
+🪙 {symbol}:
+수량: {info['total_quantity']:.8f}
+거래 가능 수량: {info['free']:.8f}
+거래 중 잠김: {info['locked']:.8f}
+평균매수가: {info['average_buy_price']:,.2f} USDT
+현재가격: {info['current_price']:,.2f} USDT
+평가금액: {coin_value:,.2f} USDT
+수익률: {info['profit_rate']:.2f}%
+코인별 투자한도: {limit_amount.get(symbol, 0):,.2f} USDT
+──────────────"""
+
+        # 총 자산 및 전체 수익률 계산
+        message += f"""
+💵 총 자산: {total_asset:,.2f} USDT
+💵 전체 수익률: {((total_asset - self.config.seed_money) / self.config.seed_money * 100):.2f}%
+──────────────"""
+
+        # 메시지 전송 (Slack)
+        try:
+            self.send_slack_message(self.config.slack_asset_channel_id, message)
+        except Exception as e:
+            print(f"자산 보고 오류: {str(e)}")
 
     def send_trade_info(self):
         print("거래 정보 전송 함수를 실행합니다.")
