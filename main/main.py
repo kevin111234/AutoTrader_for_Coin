@@ -46,6 +46,8 @@ def main():
                 initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
     # 초기 자산 조회 - notifier.py
+    notifier.get_asset_info(ticker_list)
+    limit_amount = notifier.get_limit_amount()
 
     # 반복문 시작
     while True:
