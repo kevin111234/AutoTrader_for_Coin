@@ -24,8 +24,10 @@ def main():
         vp_data[symbol] = {}
         tpo_data[symbol] = {}
 
+        # 1분봉, 5분봉, 1시간봉 각각 300개의 데이터 조회
         for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
             data = data_control.data(client, symbol, timeframe, limit=300)
+            # 각 데이터에 대한 기술적 지표 계산산
             data = data_control.cal_moving_average(data)
             data = data_control.cal_rsi(data)
             data = data_control.cal_bollinger_band(data)
@@ -34,14 +36,17 @@ def main():
             # 비어있는 값 제거
             data = data.dropna()
             
+            # 데이터 길이는 140개로 제한. (120일 이평선 계산을 위함.)
             if len(data) > 140:
                 data = data.iloc[-140:].reset_index(drop=True)
             initial_data[symbol][timeframe] = data
-            profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)  # 함수 실행
+            # 남은 데이터에 대한 VP, TPO 계산
+            profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
             
             vp_data[symbol][timeframe] = profile_df
             tpo_data[symbol][timeframe] = sr_levels
 
+            # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
             if timeframe == "1HOUR" or timeframe == "5MINUTE":
                 initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
@@ -52,7 +57,7 @@ def main():
     # 반복문 시작
     while True:
         try:
-            print("자산 정보를 업데이트합니다.")
+            # 자산 정보 업데이트트
             notifier.get_asset_info(ticker_list)
 
             # 보유량 0 체크 (USDT 제외)
@@ -67,21 +72,25 @@ def main():
                 limit_amounts = notifier.get_limit_amount()
                 print("매수 한도가 업데이트되었습니다.")
 
-            print("매수/매도 판단을 시작합니다.")
+            # 매수/매도 판단 로직직
             for ticker in ticker_list:
-                ticker = ticker.split("-")
-                symbol = str(ticker[1]) + str(ticker[0])
+                if ticker == "USDT": # USDT는 스킵
+                    continue
+                # 암호화폐 티커 형식 수정 ex) BTCUSDT
+                symbol = str(ticker) + "USDT"
 
-                # 데이터 업데이트
+                # 데이터 업데이트. 1분, 5분, 1시간 봉에 대한 업데이트 진행행
                 for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
                     initial_data[symbol][timeframe] = data_control.update_data(
                         client, symbol, timeframe, initial_data[symbol][timeframe]
                     )
                     updated_data = initial_data[symbol][timeframe]
+                    # 업데이트된 데이터에 대한 기술적 지표 추가가
                     updated_data = data_control.cal_moving_average(updated_data)
                     updated_data = data_control.cal_rsi(updated_data)
                     updated_data = data_control.cal_bollinger_band(updated_data)
                     updated_data = data_control.cal_obv(updated_data)
+                    # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가가
                     if timeframe == "1HOUR" or timeframe == "5MINUTE":
                         updated_data = data_control.LT_trand_check(updated_data)
 
