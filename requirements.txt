@@ -19,6 +19,7 @@ pytz==2024.2
 regex==2024.11.6
 requests==2.32.3
 six==1.17.0
+slack_sdk==3.34.0
 tzdata==2024.2
 tzlocal==5.2
 urllib3==2.2.3
