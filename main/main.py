@@ -52,6 +52,21 @@ def main():
     # 반복문 시작
     while True:
         try:
+            print("자산 정보를 업데이트합니다.")
+            notifier.get_asset_info(ticker_list)
+
+            # 보유량 0 체크 (USDT 제외)
+            all_zero = all(
+                notifier.asset_info[coin]["total_quantity"] == 0
+                for coin in ticker_list
+                if coin != "USDT"
+            )
+
+            # 모든 암호화폐의 보유량이 0이면 매수 한도 업데이트
+            if all_zero:
+                limit_amounts = notifier.get_limit_amount()
+                print("매수 한도가 업데이트되었습니다.")
+
             print("매수/매도 판단을 시작합니다.")
             for ticker in ticker_list:
                 ticker = ticker.split("-")
