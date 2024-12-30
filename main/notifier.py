@@ -1,9 +1,12 @@
 from config import Config
 from binance.client import Client
+from slack_sdk import WebClient
+
 class Notifier():
     def __init__(self):
         config = Config()
         self.client = Client(config.binance_access_key, config.binance_secret_key)
+        self.slack = WebClient(token=self.config.slack_api_token)
         self.asset_info = {}
         self.target_coins = ["USDT", ]
         coins = config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
@@ -173,8 +176,11 @@ class Notifier():
             print(error_msg)
             return {}
 
-    def send_slack_message(self):
-        print("slack 메시지 전송 함수를 실행합니다.")
+    def send_slack_message(self, channel_id, message):
+        try:
+            self.slack.chat_postMessage(channel=channel_id, text=message)
+        except Exception as e:
+            print(f"Error sending message: {e}")
 
     def send_asset_info(self):
         print("자산 정보 전송 함수를 실행합니다.")
