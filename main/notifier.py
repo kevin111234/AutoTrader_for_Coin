@@ -6,7 +6,7 @@ class Notifier():
     def __init__(self):
         self.config = Config()
         self.client = Client(self.config.binance_access_key, self.config.binance_secret_key)
-        self.slack = WebClient(token=self.config.slack_api_token)
+        self.slack = WebClient(token=self.config.slack_api_key)
         self.asset_info = {}
         self.target_coins = ["USDT", ]
         coins = self.config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
