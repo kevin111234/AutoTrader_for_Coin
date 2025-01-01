@@ -231,9 +231,3 @@ class Notifier():
             self.send_slack_message(self.config.slack_asset_channel_id, message)
         except Exception as e:
             print(f"자산 보고 오류: {str(e)}")
-
-    def send_trade_info(self):
-        print("거래 정보 전송 함수를 실행합니다.")
-
-    def send_error_info(self):
-        print("에러 정보 전송 함수를 실행합니다.")
