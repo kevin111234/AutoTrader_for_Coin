@@ -54,6 +54,8 @@ def main():
     notifier.get_asset_info(ticker_list)
     limit_amount = notifier.get_limit_amount()
 
+    notifier.send_asset_info(limit_amount)
+
     # 반복문 시작
     while True:
         try:
