@@ -409,7 +409,7 @@ class Data_Control():
 
 
     def data(self,client,symbol,timeframe, limit = 300):
-        
+        symbol = f"{symbol}USDT"
         if timeframe == "1MINUTE":
             candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
         elif timeframe == "5MINUTE":
