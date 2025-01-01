@@ -223,7 +223,7 @@ class Notifier():
         # 총 자산 및 전체 수익률 계산
         message += f"""
 💵 총 자산: {total_asset:,.2f} USDT
-💵 전체 수익률: {((total_asset - self.config.seed_money) / self.config.seed_money * 100):.2f}%
+💵 전체 수익률: {((float(total_asset) - float(self.config.seed_money)) / float(self.config.seed_money) * 100):.2f}%
 ──────────────"""
 
         # 메시지 전송 (Slack)
