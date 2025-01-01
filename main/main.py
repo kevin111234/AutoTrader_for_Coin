@@ -83,10 +83,10 @@ def main():
 
                 # 데이터 업데이트. 1분, 5분, 1시간 봉에 대한 업데이트 진행행
                 for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
-                    initial_data[symbol][timeframe] = data_control.update_data(
-                        client, symbol, timeframe, initial_data[symbol][timeframe]
+                    initial_data[ticker][timeframe] = data_control.update_data(
+                        client, symbol, timeframe, initial_data[ticker][timeframe]
                     )
-                    updated_data = initial_data[symbol][timeframe]
+                    updated_data = initial_data[ticker][timeframe]
                     # 업데이트된 데이터에 대한 기술적 지표 추가가
                     updated_data = data_control.cal_moving_average(updated_data)
                     updated_data = data_control.cal_rsi(updated_data)
@@ -97,18 +97,18 @@ def main():
                         updated_data = data_control.LT_trand_check(updated_data)
 
                     # TPO/VP 데이터 업데이트
-                    initial_data[symbol][timeframe] = updated_data
-                    data = initial_data[symbol][timeframe]
+                    initial_data[ticker][timeframe] = updated_data
+                    data = initial_data[ticker][timeframe]
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
-                    vp_data[symbol][timeframe] = profile_df
-                    tpo_data[symbol][timeframe] = sr_levels
+                    vp_data[ticker][timeframe] = profile_df
+                    tpo_data[ticker][timeframe] = sr_levels
 
             # 매수/매도 판단
-            print(initial_data[symbol])
+            print(initial_data[ticker])
 
             # 주문 진행
 
-            time.sleep(3)
+            time.sleep(10)
         except Exception as e:
             print(f"메인 루프 오류: {e}")
             # notifier.py를 통해 error 로그 전송

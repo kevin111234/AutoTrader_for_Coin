@@ -61,7 +61,7 @@ class Notifier():
                     continue
 
                 # 4. 현재 가격 조회
-                current_price = float(self.client.get_symbol_ticker(f"{asset}USDT")['price'])
+                current_price = float(self.client.get_symbol_ticker(symbol="BTCUSDT")['price'])
 
                 # 5. 보유 수량이 0인 경우 (현재 가격 제외하고 모두 0으로 저장)
                 if total_quantity == 0:
