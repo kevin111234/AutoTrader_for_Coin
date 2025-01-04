@@ -27,7 +27,7 @@ def main():
         # 1분봉, 5분봉, 1시간봉 각각 300개의 데이터 조회
         for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
             data = data_control.data(client, symbol, timeframe, limit=300)
-            # 각 데이터에 대한 기술적 지표 계산산
+            # 각 데이터에 대한 기술적 지표 계산
             data = data_control.cal_moving_average(data)
             data = data_control.cal_rsi(data)
             data = data_control.cal_bollinger_band(data)
@@ -59,7 +59,7 @@ def main():
     # 반복문 시작
     while True:
         try:
-            # 자산 정보 업데이트트
+            # 자산 정보 업데이트
             notifier.get_asset_info(ticker_list)
 
             # 보유량 0 체크 (USDT 제외)
@@ -74,25 +74,25 @@ def main():
                 limit_amounts = notifier.get_limit_amount()
                 print("매수 한도가 업데이트되었습니다.")
 
-            # 매수/매도 판단 로직직
+            # 매수/매도 판단 로직
             for ticker in ticker_list:
                 if ticker == "USDT": # USDT는 스킵
                     continue
                 # 암호화폐 티커 형식 수정 ex) BTCUSDT
                 symbol = str(ticker) + "USDT"
 
-                # 데이터 업데이트. 1분, 5분, 1시간 봉에 대한 업데이트 진행행
+                # 데이터 업데이트. 1분, 5분, 1시간 봉에 대한 업데이트 진행
                 for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
                     initial_data[ticker][timeframe] = data_control.update_data(
                         client, symbol, timeframe, initial_data[ticker][timeframe]
                     )
                     updated_data = initial_data[ticker][timeframe]
-                    # 업데이트된 데이터에 대한 기술적 지표 추가가
+                    # 업데이트된 데이터에 대한 기술적 지표 추가
                     updated_data = data_control.cal_moving_average(updated_data)
                     updated_data = data_control.cal_rsi(updated_data)
                     updated_data = data_control.cal_bollinger_band(updated_data)
                     updated_data = data_control.cal_obv(updated_data)
-                    # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가가
+                    # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가
                     if timeframe == "1HOUR" or timeframe == "5MINUTE":
                         updated_data = data_control.LT_trand_check(updated_data)
 
@@ -103,10 +103,10 @@ def main():
                     vp_data[ticker][timeframe] = profile_df
                     tpo_data[ticker][timeframe] = sr_levels
 
-            # 매수/매도 판단
-            print(initial_data[ticker])
+                # 매수/매도 판단
+                print(initial_data[ticker])
 
-            # 주문 진행
+                # 주문 진행
 
             time.sleep(10)
         except Exception as e:

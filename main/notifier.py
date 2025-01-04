@@ -13,7 +13,7 @@ class Notifier():
         for i in range(len(coins)):
             self.target_coins.append(coins[i])
 
-    def get_asset_info(self, symbol):
+    def get_asset_info(self):
         """반환 형태 예시
         {
             "USDT": {
@@ -61,7 +61,7 @@ class Notifier():
                     continue
 
                 # 4. 현재 가격 조회
-                current_price = float(self.client.get_symbol_ticker(symbol="BTCUSDT")['price'])
+                current_price = float(self.client.get_symbol_ticker(symbol = (f"{asset}USDT") )['price'])
 
                 # 5. 보유 수량이 0인 경우 (현재 가격 제외하고 모두 0으로 저장)
                 if total_quantity == 0:
@@ -96,7 +96,7 @@ class Notifier():
                     profit_rate = ((current_price - avg_buy_price) / avg_buy_price) * 100
 
                 # 8. 결과 저장
-                self.asset_info[symbol] = {
+                self.asset_info[asset] = {
                     "free": free, # 거래가능 수량
                     "locked": locked, # 거래 진행중인 수량
                     "total_quantity": total_quantity, # 보유량

@@ -326,20 +326,39 @@ class Data_Control():
             spread_20_60_diff: Spread_20_60의 3틱 전 대비 변화량
             obv_diff: OBV의 3틱 전 대비 변화량
             """
-            if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0 and Price_vs_SMA20_1 and Spread_20_60_vs_Threshold:
-                return 3 #"Level 3 UpTrend"
-            elif ma_trend == "UpTrend" and (spread_20_60_diff > 0 or obv_diff > 0) and (Price_vs_SMA20_1 or Spread_20_60_vs_Threshold):
-                return 2 #"Level 2 UpTrend"
-            elif ma_trend == "UpTrend":
-                return 1 #"Level 1 UpTrend"
-            elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0 and Price_vs_SMA20_2 and not Spread_20_60_vs_Threshold:
-                return -3 #"Level 3 DownTrend"
-            elif ma_trend == "DownTrend" and (spread_20_60_diff < 0 or obv_diff < 0) and (Price_vs_SMA20_2 or not Spread_20_60_vs_Threshold):
-                return -2 #"Level 2 DownTrend"
+            if ma_trend == "UpTrend":
+                if spread_20_60_diff > 0 and obv_diff > 0 and Price_vs_SMA20_1 and Spread_20_60_vs_Threshold:
+                    return 8  # Level 8 UpTrend - 매우 강한 상승 추세
+                elif spread_20_60_diff > 0 and obv_diff > 0:
+                    return 7  # Level 7 UpTrend - 강한 상승 추세
+                elif spread_20_60_diff > 0 or obv_diff > 0:
+                    return 6  # Level 6 UpTrend - 중간 상승 추세
+                elif Price_vs_SMA20_1:
+                    return 5  # Level 5 UpTrend - 약한 상승 추세
+                else:
+                    return 4  # Level 4 UpTrend - 상승 가능성 있음
             elif ma_trend == "DownTrend":
-                return -1 #"Level 1 DownTrend"
+                if spread_20_60_diff < 0 and obv_diff < 0 and Price_vs_SMA20_2 and not Spread_20_60_vs_Threshold:
+                    return -8  # Level -8 DownTrend - 매우 강한 하락 추세
+                elif spread_20_60_diff < 0 and obv_diff < 0:
+                    return -7  # Level -7 DownTrend - 강한 하락 추세
+                elif spread_20_60_diff < 0 or obv_diff < 0:
+                    return -6  # Level -6 DownTrend - 중간 하락 추세
+                elif Price_vs_SMA20_2:
+                    return -5  # Level -5 DownTrend - 약한 하락 추세
+                else:
+                    return -4  # Level -4 DownTrend - 하락 가능성 있음
             else:
-                return 0 #"SideWays"
+                if abs(spread_20_60_diff) < 0.1 and abs(obv_diff) < 0.1:
+                    return 0  # Level 0 - 완전한 횡보
+                elif abs(spread_20_60_diff) < 0.2 and abs(obv_diff) < 0.2:
+                    return 1  # Level 1 - 매우 약한 횡보
+                elif abs(spread_20_60_diff) < 0.3 and abs(obv_diff) < 0.3:
+                    return 2  # Level 2 - 약한 횡보
+                elif abs(spread_20_60_diff) < 0.5 and abs(obv_diff) < 0.5:
+                    return 3  # Level 3 - 강한 횡보
+                else:
+                    return -1  # Level -1 - 불확실한 횡보
 
         # 4) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
         #    이미 Trend가 채워져 있는 구간은 건너뛴다는 개념
@@ -403,7 +422,9 @@ class Data_Control():
                 continue
             
             # Trend 업데이트
-            df.loc[i, 'Trend'] = detect_trend(MA_Trend, Spread_20_60_diff, OBV_diff, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
+            trend_level = detect_trend(MA_Trend, Spread_20_60_diff, OBV_diff, 
+                                      Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
+            df.loc[i, 'Trend'] = trend_level
 
         return df
 
