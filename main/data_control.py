@@ -110,39 +110,49 @@ class Data_Control():
     
     def cal_bollinger_band(self, df, period=20, num_std=2):
         """
-        data: 'Close' 열이 포함된 pandas DataFrame
-        period: 볼린저 밴드 계산용 이동평균 기간 (기본=20)
-        num_std: 표준편차 배수 (기본=2)
+        볼린저 밴드, %b 및 Bandwidth를 계산하는 함수
+        
+        매개변수:
+        df : pandas DataFrame - 'Close' 열이 포함된 데이터프레임
+        period : int - 볼린저 밴드 이동평균 기간 (기본값 20)
+        num_std : int - 표준편차 배수 (기본값 2)
+        
+        반환:
+        df : pandas DataFrame - 수정된 볼린저 밴드, %b 및 밴드폭 포함
         """
         
-        # 1) 볼린저 컬럼들이 없으면 만들어 둠
+        # 1) 볼린저 및 %b, 밴드폭 컬럼들이 없으면 만들어 둠
         if 'middle_boll' not in df.columns:
             df['middle_boll'] = np.nan
         if 'upper_boll' not in df.columns:
             df['upper_boll'] = np.nan
         if 'lower_boll' not in df.columns:
             df['lower_boll'] = np.nan
+        if 'percent_b' not in df.columns:
+            df['percent_b'] = np.nan
+        if 'bandwidth' not in df.columns:
+            df['bandwidth'] = np.nan
 
-        # 2) 마지막으로 유효한(=NaN이 아닌) 중간선(middle_boll) 인덱스를 찾음
-        #    세 컬럼 중 하나만 봐도 되지만, 여기선 middle_boll 기준으로 예시
+        # 2) 마지막으로 유효한 볼린저밴드 인덱스 확인
         last_valid_boll = df['middle_boll'].last_valid_index()
         if last_valid_boll is None:
-            last_valid_boll = -1  # 전부 NaN이면 -1로 설정해서 0부터 계산
+            last_valid_boll = -1  # NaN이면 -1로 설정해서 처음부터 계산
 
-        # 3) last_valid_boll + 1부터 끝까지 순회
+        # 3) last_valid_boll + 1부터 끝까지 순회하며 볼린저 밴드 및 추가 지표 계산
         for i in range(last_valid_boll + 1, len(df)):
-            # period 미만 구간은 볼린저밴드 계산 불가능 -> skip
+            # period 미만 구간은 볼린저밴드 계산 불가
             if i < period:
                 continue
             
-            # 이미 값이 들어있다면( NaN이 아니라면 ) 건너뛰기
-            # 혹은 middle/upper/lower 중 하나라도 NaN이면 재계산
+            # 볼린저밴드 값이 이미 존재하면 건너뛰기
             if (pd.notna(df.loc[i, 'middle_boll']) and 
                 pd.notna(df.loc[i, 'upper_boll']) and
-                pd.notna(df.loc[i, 'lower_boll'])):
+                pd.notna(df.loc[i, 'lower_boll']) and
+                pd.notna(df.loc[i, 'percent_b']) and
+                pd.notna(df.loc[i, 'bandwidth'])):
                 continue
-            
-            # i번째 행까지 slice해서 rolling
+
+            # i번째까지 슬라이스하여 롤링 평균 및 표준편차 계산
             window_series = df.loc[:i, 'Close'].rolling(period)
             mean_val = window_series.mean().iloc[-1]
             std_val = window_series.std().iloc[-1]
@@ -151,10 +161,19 @@ class Data_Control():
             upper_val = mean_val + num_std * std_val
             lower_val = mean_val - num_std * std_val
 
-            # 해당 인덱스에 기록
+            # %b 계산
+            current_price = df.loc[i, 'Close']
+            percent_b = (current_price - lower_val) / (upper_val - lower_val)
+
+            # 밴드폭(Bandwidth) 계산
+            bandwidth = ((upper_val - lower_val) / mean_val) * 100
+
+            # 결과 반영
             df.loc[i, 'middle_boll'] = mean_val
             df.loc[i, 'upper_boll'] = upper_val
             df.loc[i, 'lower_boll'] = lower_val
+            df.loc[i, 'percent_b'] = percent_b
+            df.loc[i, 'bandwidth'] = bandwidth
 
         return df
 
