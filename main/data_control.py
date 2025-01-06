@@ -308,142 +308,129 @@ class Data_Control():
 
     def LT_trand_check(self, df):
         """
-        기존 LT_trand_check 함수를 '2번 방식' 개념으로 수정:
-        이미 계산된 구간은 건너뛰고, NaN 값만 업데이트.
-
-        data_1HOUR: 반드시
-          - 'SMA_20', 'SMA_60', 'SMA_120'
-          - 'Close', 'Volume'
-        컬럼이 존재한다고 가정.
-        """
-        # 편의상 data_1HOUR를 df로 복사
-        df = df.reset_index(drop=True)
+        상승 및 하락 추세 판단 함수
+        볼린저 밴드 %b 및 Bandwidth 기반으로 추세 분석 강화
+        Relative Bandwidth 계산을 포함하여 추세 전환 가능성까지 감지
         
-        # 1) 필요한 컬럼들이 없으면 새로 만듦(처음 실행 시)
-        needed_cols = [
-            'Spread_20_60', 'Spread_60_120', 'Spread_20_120',
-            'Trend',
-            'Spread_20_60_MA', 'Spread_60_120_MA', 'Spread_20_120_MA'
-        ]
+        매개변수:
+        df : pandas DataFrame - 볼린저 밴드 및 가격 데이터가 포함된 데이터프레임
+        
+        반환:
+        df : pandas DataFrame - Trend 열에 추세 레벨을 반영하여 반환
+        """
+
+        # MA 트렌드 판별 함수
+        def check_ma_trend(sma20, sma60, sma120, rbw):
+            """
+            이동평균선 상태 및 상대 밴드폭(RBW)을 바탕으로 추세 상태를 정수로 매핑하는 함수
+            
+            매개변수:
+            sma20 : float - 20일 이동평균선
+            sma60 : float - 60일 이동평균선
+            sma120 : float - 120일 이동평균선
+            rbw : float - 상대 밴드폭 (Relative Bandwidth)
+            
+            반환:
+            int - 트렌드 상태 (양수: 상승, 음수: 하락, 0: 횡보)
+
+            📋 추세 상태 정리 (1~10)  
+
+            📈 상승 추세  
+            1. 상승 추세 속 박스권 – `MA60 < MA20 < MA120` and `0.9 ≤ RBW ≤ 1.1`  
+            2. 상승 추세에서 추세 전환 준비 – `MA60 < MA20 < MA120` and `RBW < 0.8`  
+            3. 강한 상승 중 박스권 – `MA60 < MA120 < MA20` and `0.9 ≤ RBW ≤ 1.1`  
+            4. 강한 상승 후 추세 전환 가능성 – `MA60 < MA120 < MA20` and `RBW < 0.8`  
+            5. 강한 상승 추세 (변동성 확대) – `MA120 < MA60 < MA20` and `RBW > 1.1`  
+
+            📉 하락 추세  
+            6. 하락 추세 속 박스권 – `MA20 < MA60 < MA120` and `0.9 ≤ RBW ≤ 1.1`  
+            7. 하락 추세에서 추세 전환 준비 – `MA20 < MA60 < MA120` and `RBW < 0.8`  
+            8. 강한 하락 추세 (변동성 확대) – `MA20 < MA60 < MA120` and `RBW > 1.1`  
+
+            🔄 추세 전환 준비  
+            9. 추세 전환 준비 상태의 박스권 – `MA120 < MA20 < MA60` and `0.9 ≤ RBW ≤ 1.1`  
+            10. 추세 전환 직전 (변동성 축소) – `MA120 < MA20 < MA60` and `RBW < 0.8`  
+            """
+            
+            # 1번 상태: 상승 추세 속 박스권 (MA60 < MA20 < MA120, RBW 0.9~1.1)
+            if sma60 < sma20 < sma120 and 0.9 <= rbw <= 1.1:
+                return 1
+            
+            # 2번 상태: 상승 추세에서 추세 전환 준비 (MA60 < MA20 < MA120, RBW < 0.8)
+            elif sma60 < sma20 < sma120 and rbw < 0.8:
+                return 2
+            
+            # 3번 상태: 강한 상승 중 박스권 (MA60 < MA120 < MA20, RBW 0.9~1.1)
+            elif sma60 < sma120 < sma20 and 0.9 <= rbw <= 1.1:
+                return 3
+            
+            # 4번 상태: 강한 상승 후 추세 전환 가능성 (MA60 < MA120 < MA20, RBW < 0.8)
+            elif sma60 < sma120 < sma20 and rbw < 0.8:
+                return 4
+            
+            # 5번 상태: 하락 추세 속 박스권 (MA20 < MA60 < MA120, RBW 0.9~1.1)
+            elif sma20 < sma60 < sma120 and 0.9 <= rbw <= 1.1:
+                return 5
+            
+            # 6번 상태: 하락 추세에서 추세 전환 준비 (MA20 < MA60 < MA120, RBW < 0.8)
+            elif sma20 < sma60 < sma120 and rbw < 0.8:
+                return 6
+            
+            # 7번 상태: 추세 전환 준비 상태의 박스권 (MA120 < MA20 < MA60, RBW 0.9~1.1)
+            elif sma120 < sma20 < sma60 and 0.9 <= rbw <= 1.1:
+                return 7
+            
+            # 8번 상태: 추세 전환 직전 (MA120 < MA20 < MA60, RBW < 0.8)
+            elif sma120 < sma20 < sma60 and rbw < 0.8:
+                return 8
+            
+            # 9번 상태: 강한 상승 추세 (MA120 < MA60 < MA20, RBW > 1.1)
+            elif sma120 < sma60 < sma20 and rbw > 1.1:
+                return 9
+            
+            # 10번 상태: 강한 하락 추세 (MA20 < MA60 < MA120, RBW > 1.1)
+            elif sma20 < sma60 < sma120 and rbw > 1.1:
+                return 10
+            
+            # 그 외 상황 (예외적 횡보, 추세 모호)
+            else:
+                return 0
+
+        # 1) 필요한 컬럼들이 없으면 새로 만듦
+        needed_cols = ['Trend', 'RBW']
         for col in needed_cols:
             if col not in df.columns:
                 df[col] = np.nan
 
-        # 2) MA 트렌드 판별 함수
-        def check_ma_trend(sma20, sma60, sma120):
-            if sma20 > sma60 > sma120:
-                return "UpTrend"
-            elif sma20 < sma60 < sma120:
-                return "DownTrend"
-            else:
-                return "SideWays"
-
-        # 3) 추세(Trend) 판별 함수
-        def detect_trend(ma_trend, spread_20_60_diff, obv_diff, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold):
-            """
-            ma_trend: "UpTrend", "DownTrend", "SideWays"
-            spread_20_60_diff: Spread_20_60의 3틱 전 대비 변화량
-            obv_diff: OBV의 3틱 전 대비 변화량
-            """
-            if ma_trend == "UpTrend":
-                if spread_20_60_diff > 0 and obv_diff > 0 and Price_vs_SMA20_1 and Spread_20_60_vs_Threshold:
-                    return 8  # Level 8 UpTrend - 매우 강한 상승 추세
-                elif spread_20_60_diff > 0 and obv_diff > 0:
-                    return 7  # Level 7 UpTrend - 강한 상승 추세
-                elif spread_20_60_diff > 0 or obv_diff > 0:
-                    return 6  # Level 6 UpTrend - 중간 상승 추세
-                elif Price_vs_SMA20_1:
-                    return 5  # Level 5 UpTrend - 약한 상승 추세
-                else:
-                    return 4  # Level 4 UpTrend - 상승 가능성 있음
-            elif ma_trend == "DownTrend":
-                if spread_20_60_diff < 0 and obv_diff < 0 and Price_vs_SMA20_2 and not Spread_20_60_vs_Threshold:
-                    return -8  # Level -8 DownTrend - 매우 강한 하락 추세
-                elif spread_20_60_diff < 0 and obv_diff < 0:
-                    return -7  # Level -7 DownTrend - 강한 하락 추세
-                elif spread_20_60_diff < 0 or obv_diff < 0:
-                    return -6  # Level -6 DownTrend - 중간 하락 추세
-                elif Price_vs_SMA20_2:
-                    return -5  # Level -5 DownTrend - 약한 하락 추세
-                else:
-                    return -4  # Level -4 DownTrend - 하락 가능성 있음
-            else:
-                if abs(spread_20_60_diff) < 0.1 and abs(obv_diff) < 0.1:
-                    return 0  # Level 0 - 완전한 횡보
-                elif abs(spread_20_60_diff) < 0.2 and abs(obv_diff) < 0.2:
-                    return 1  # Level 1 - 매우 약한 횡보
-                elif abs(spread_20_60_diff) < 0.3 and abs(obv_diff) < 0.3:
-                    return 2  # Level 2 - 약한 횡보
-                elif abs(spread_20_60_diff) < 0.5 and abs(obv_diff) < 0.5:
-                    return 3  # Level 3 - 강한 횡보
-                else:
-                    return -1  # Level -1 - 불확실한 횡보
-
-        # 4) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
-        #    이미 Trend가 채워져 있는 구간은 건너뛴다는 개념
+        # 2) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
         last_valid = df['Trend'].last_valid_index()
         if last_valid is None:
-            last_valid = -1  # 전부 NaN이면 -1로
+            last_valid = -1  # 전부 NaN이면 -1로 설정
 
-        # 5) for문으로 (마지막 유효인덱스 + 1) ~ 끝까지 순회
+        # 3) MA 트렌드 및 횡보 상태 판별
         for i in range(last_valid + 1, len(df)):
-            # 이미 Trend가 있으면( NaN이 아니면 ) 건너뛰기
             if pd.notna(df.loc[i, 'Trend']):
                 continue
             
-            # =============== (1) MA_Trend 판별 ===============
+            # 이동평균선 데이터
             sma20 = df.loc[i, 'SMA_20']
             sma60 = df.loc[i, 'SMA_60']
             sma120 = df.loc[i, 'SMA_120']
-            close_price = df.loc[i, 'Close']
-            
-            # 값이 하나라도 NaN이면 트렌드 판단 불가
-            if pd.isna(sma20) or pd.isna(sma60) or pd.isna(sma120):
+            bandwidth = df.loc[i, 'bandwidth']
+
+            # 데이터 누락 시 건너뛰기
+            if pd.isna(sma20) or pd.isna(sma60) or pd.isna(sma120) or pd.isna(bandwidth):
                 continue
-            
-            # MA_Trend 업데이트
-            MA_Trend = check_ma_trend(sma20, sma60, sma120)
 
-            # =============== (2) Spread 계산 ===============
-            df.loc[i, 'Spread_20_60']  = sma20 - sma60
-            df.loc[i, 'Spread_60_120'] = sma60 - sma120
-            df.loc[i, 'Spread_20_120'] = sma20 - sma120
-            df.loc[i, 'Spread_20_60_MA'] = df.loc[i-19:i, 'Spread_20_60'].mean()
-            df.loc[i, 'Spread_60_120_MA'] = df.loc[i-19:i, 'Spread_60_120'].mean()
-            df.loc[i, 'Spread_20_120_MA'] = df.loc[i-19:i, 'Spread_20_120'].mean()
+            # RBW(상대 밴드폭) 계산
+            rbw = bandwidth / df['bandwidth'].rolling(20).mean().iloc[i]
+            df.loc[i, 'RBW'] = rbw
 
-            # 가격과 20일 이동평균선 비교
-            Price_vs_SMA20_1 = close_price > sma20*1.25 
-            Price_vs_SMA20_2 = close_price < sma20*0.75 
+            # MA 트렌드 판별 (새로운 함수 활용)
+            trend_state = check_ma_trend(sma20, sma60, sma120, rbw)
 
-            # 20일과 60일 이동평균선의 편차 확인
-            Spread_20_60_vs_Threshold = df.loc[i, 'Spread_20_60'] > df.loc[i, 'Spread_20_60_MA']
-
-            # =============== (3) Spread 기울기(3틱 전 대비 차이) ===============
-            # i-3 >= 0 일 때만 계산 가능
-            if i >= 3:
-                Spread_20_60_diff  = df.loc[i, 'Spread_20_60']  - df.loc[i-3, 'Spread_20_60']
-                # Spread_60_120_diff = df.loc[i, 'Spread_60_120'] - df.loc[i-3, 'Spread_60_120']
-                # Spread_20_120_diff = df.loc[i, 'Spread_20_120'] - df.loc[i-3, 'Spread_20_120']
-            else:
-                Spread_20_60_diff = np.nan
-            
-            # =============== (5) OBV 기울기(3틱 전 대비 차이) ===============
-            if i >= 3 and not pd.isna(df.loc[i, 'obv']) and not pd.isna(df.loc[i-3, 'obv']):
-                OBV_diff = df.loc[i, 'obv'] - df.loc[i-3, 'obv']
-            else:
-                OBV_diff = np.nan
-
-            # =============== (6) 최종 Trend 판별 ===============
-            # MA_Trend, Spread_20_60_diff, OBV_diff 중 하나라도 NaN이면 판별 불가
-            if pd.isna(MA_Trend) or pd.isna(Spread_20_60_diff) or pd.isna(OBV_diff):
-                # 아직 3틱 안 됐거나, 필요한 값이 NaN이면 Trend를 구할 수 없음
-                continue
-            
-            # Trend 업데이트
-            trend_level = detect_trend(MA_Trend, Spread_20_60_diff, OBV_diff, 
-                                      Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
-            df.loc[i, 'Trend'] = trend_level
+            # Trend 컬럼에 상태 업데이트
+            df.loc[i, 'Trend'] = trend_state
 
         return df
 
