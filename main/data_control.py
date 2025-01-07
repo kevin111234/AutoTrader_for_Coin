@@ -331,67 +331,92 @@ class Data_Control():
             rbw : float - 상대 밴드폭 (Relative Bandwidth)
             
             반환:
-            int - 트렌드 상태 (양수: 상승, 음수: 하락, 0: 횡보)
-
-            📋 추세 상태 정리 (1~10)  
-
-            📈 상승 추세  
-            1. 상승 추세 속 박스권 – `MA60 < MA20 < MA120` and `0.9 ≤ RBW ≤ 1.1`  
-            2. 상승 추세에서 추세 전환 준비 – `MA60 < MA20 < MA120` and `RBW < 0.8`  
-            3. 강한 상승 중 박스권 – `MA60 < MA120 < MA20` and `0.9 ≤ RBW ≤ 1.1`  
-            4. 강한 상승 후 추세 전환 가능성 – `MA60 < MA120 < MA20` and `RBW < 0.8`  
-            5. 강한 상승 추세 (변동성 확대) – `MA120 < MA60 < MA20` and `RBW > 1.1`  
-
-            📉 하락 추세  
-            6. 하락 추세 속 박스권 – `MA20 < MA60 < MA120` and `0.9 ≤ RBW ≤ 1.1`  
-            7. 하락 추세에서 추세 전환 준비 – `MA20 < MA60 < MA120` and `RBW < 0.8`  
-            8. 강한 하락 추세 (변동성 확대) – `MA20 < MA60 < MA120` and `RBW > 1.1`  
-
-            🔄 추세 전환 준비  
-            9. 추세 전환 준비 상태의 박스권 – `MA120 < MA20 < MA60` and `0.9 ≤ RBW ≤ 1.1`  
-            10. 추세 전환 직전 (변동성 축소) – `MA120 < MA20 < MA60` and `RBW < 0.8`  
+            int - 트렌드 상태 (-9 ~ 9)
             """
-            
-            # 1번 상태: 상승 추세 속 박스권 (MA60 < MA20 < MA120, RBW 0.9~1.1)
-            if sma60 < sma20 < sma120 and 0.9 <= rbw <= 1.1:
-                return 1
-            
-            # 2번 상태: 상승 추세에서 추세 전환 준비 (MA60 < MA20 < MA120, RBW < 0.8)
-            elif sma60 < sma20 < sma120 and rbw < 0.8:
-                return 2
-            
-            # 3번 상태: 강한 상승 중 박스권 (MA60 < MA120 < MA20, RBW 0.9~1.1)
-            elif sma60 < sma120 < sma20 and 0.9 <= rbw <= 1.1:
-                return 3
-            
-            # 4번 상태: 강한 상승 후 추세 전환 가능성 (MA60 < MA120 < MA20, RBW < 0.8)
-            elif sma60 < sma120 < sma20 and rbw < 0.8:
-                return 4
-            
-            # 5번 상태: 하락 추세 속 박스권 (MA20 < MA60 < MA120, RBW 0.9~1.1)
-            elif sma20 < sma60 < sma120 and 0.9 <= rbw <= 1.1:
-                return 5
-            
-            # 6번 상태: 하락 추세에서 추세 전환 준비 (MA20 < MA60 < MA120, RBW < 0.8)
-            elif sma20 < sma60 < sma120 and rbw < 0.8:
-                return 6
-            
-            # 7번 상태: 추세 전환 준비 상태의 박스권 (MA120 < MA20 < MA60, RBW 0.9~1.1)
-            elif sma120 < sma20 < sma60 and 0.9 <= rbw <= 1.1:
-                return 7
-            
-            # 8번 상태: 추세 전환 직전 (MA120 < MA20 < MA60, RBW < 0.8)
-            elif sma120 < sma20 < sma60 and rbw < 0.8:
-                return 8
-            
-            # 9번 상태: 강한 상승 추세 (MA120 < MA60 < MA20, RBW > 1.1)
-            elif sma120 < sma60 < sma20 and rbw > 1.1:
-                return 9
-            
-            # 10번 상태: 강한 하락 추세 (MA20 < MA60 < MA120, RBW > 1.1)
-            elif sma20 < sma60 < sma120 and rbw > 1.1:
-                return 10
-            
+            # 강한 상승 배열 sma120 < sma60 < sma20
+            if sma120 < sma60 < sma20:
+                # 1. 급격한 상승, 과매수 위험 구간
+                if 1.1 < rbw:
+                    return 1
+
+                # 2. 안정적 상승 추세
+                elif 0.8 <= rbw <= 1.1:
+                    return 2
+
+                # 3. 상승 추세에서 조정 가능성
+                elif rbw < 0.8:
+                    return 3
+
+            # 불안정 상승 배열 sma60 < sma120 < sma20
+            elif sma60 < sma120 < sma20:
+                # 4. 상승 반전 시도, 변동성 높음
+                if 1.1 < rbw:
+                    return 4
+
+                # 5. 상승 전환 박스권
+                elif 0.8 <= rbw <= 1.1:
+                    return 5
+
+                # 6. 상승 전환 준비
+                elif rbw < 0.8:
+                    return 6
+
+            # 약세 반등 배열 sma120 < sma20 < sma60
+            elif sma120 < sma20 < sma60:
+                # 7. 일시적 반등, 불안정
+                if 1.1 < rbw:
+                    return 7
+
+                # 8. 약세장 속 반등
+                elif 0.8 <= rbw <= 1.1:
+                    return 8
+
+                # 9. 하락 추세 재진입 가능성
+                elif rbw < 0.8:
+                    return 9
+
+            # 강한 하락 배열 sma20 < sma120 < sma60
+            elif sma20 < sma120 < sma60:
+            # -1. 급격한 하락, 과매도 위험
+                if 1.1 < rbw:
+                    return -1
+
+                # -2. 안정적 하락 추세
+                elif 0.8 <= rbw <= 1.1:
+                    return -2
+
+                # -3. 하락 추세에서 반등 가능성
+                elif rbw < 0.8:
+                    return -3
+
+            # 불안정 하락 배열 sma60 < sma20 < sma120
+            elif sma60 < sma20 < sma120:
+                # -4. 하락 반전 시도, 변동성 높음
+                if 1.1 < rbw:
+                    return -4
+
+                # -5. 하락 전환 박스권
+                elif 0.8 <= rbw <= 1.1:
+                    return -5
+
+                # -6. 하락 전환 준비
+                elif rbw < 0.8:
+                    return -6
+
+            # 급격한 하락 배열 sma20 < sma60 < sma120
+            elif sma20 < sma60 < sma120:
+                # -7. 패닉셀, 과매도 구간 진입 가능성
+                if 1.1 < rbw:
+                    return -7
+
+                # -8. 급락 후 안정화 진행중
+                elif 0.8 <= rbw <=1.1:
+                    return -8
+
+                # -9. 급락 추세 소멸, 기술적 반등 가능성 존재
+                elif rbw < 0.8:
+                    return -9
+
             # 그 외 상황 (예외적 횡보, 추세 모호)
             else:
                 return 0
