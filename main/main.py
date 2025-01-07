@@ -15,6 +15,16 @@ def main():
     data_control = Data_Control()
     notifier = Notifier()
 
+    # 서버 시간과 로컬 시간 동기화
+    local_time = int(time.time() * 1000)
+    server_time = client.get_server_time()
+    time_diff = server_time['serverTime'] - local_time
+
+    if abs(time_diff) > 1000:
+        print(f"시간 차이 발생: {time_diff}ms, 시스템 시간 동기화 필요")
+        time.sleep(time_diff / 1000)
+
+
     # 초기 데이터 조회 - data_control.py
     initial_data = {}
     vp_data = {}
@@ -51,7 +61,7 @@ def main():
                 initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
     # 초기 자산 조회 - notifier.py
-    notifier.get_asset_info(ticker_list)
+    notifier.get_asset_info()
     limit_amount = notifier.get_limit_amount()
 
     notifier.send_asset_info(limit_amount)
@@ -60,7 +70,7 @@ def main():
     while True:
         try:
             # 자산 정보 업데이트
-            notifier.get_asset_info(ticker_list)
+            notifier.get_asset_info()
 
             # 보유량 0 체크 (USDT 제외)
             all_zero = all(
