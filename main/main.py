@@ -43,6 +43,10 @@ def main():
             data = data_control.cal_bollinger_band(data)
             data = data_control.cal_obv(data)
 
+            # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
+            if timeframe == "1HOUR" or timeframe == "5MINUTE":
+                data = data_control.LT_trand_check(data)
+
             # 비어있는 값 제거
             data = data.dropna()
             
@@ -55,10 +59,6 @@ def main():
             
             vp_data[symbol][timeframe] = profile_df
             tpo_data[symbol][timeframe] = sr_levels
-
-            # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
-            if timeframe == "1HOUR" or timeframe == "5MINUTE":
-                initial_data[symbol][timeframe] = data_control.LT_trand_check(initial_data[symbol][timeframe])
 
     # 초기 자산 조회 - notifier.py
     notifier.get_asset_info()
