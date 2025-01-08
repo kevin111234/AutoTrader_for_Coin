@@ -13,31 +13,27 @@ class Data_Control():
         예: period=[20,60,120] -> ma_20, ma_60, ma_120 열 생성/갱신
         """
         
+        # 예외 처리
+        if 'Close' not in df.columns or df.empty:
+            raise ValueError("DataFrame에 'Close' 열이 없거나 데이터가 없습니다.")
+        
         # period 리스트에 있는 각 기간별로 이동평균선 계산
         for p in period:
             col_name = f"SMA_{p}"
             
-            # (1) SNA_XX 컬럼 없으면 만들기
+            # (1) SMA 컬럼 없으면 생성
             if col_name not in df.columns:
                 df[col_name] = np.nan
             
-            # (2) 이미 계산된 마지막 인덱스 찾기
-            last_valid = df[col_name].last_valid_index()
-            if last_valid is None:
-                last_valid = -1
-            
-            # (3) 마지막 계산 인덱스 + 1부터 끝까지
-            for i in range(last_valid + 1, len(df)):
+            # (2) NaN 부분만 필터링하여 계산
+            nan_indices = df[df[col_name].isna()].index
+            for i in nan_indices:
                 # p일치 안 되면 계산 불가
                 if i < p - 1:
                     continue
                 
-                # 값이 이미 있으면 건너뛰기
-                if not pd.isna(df.loc[i, col_name]):
-                    continue
-                
                 # 직전 p개 구간 mean
-                window_close = df.loc[i - p + 1 : i, 'Close']
+                window_close = df.loc[max(0, i - p + 1) : i, 'Close']
                 df.loc[i, col_name] = window_close.mean()
         
         return df
@@ -448,7 +444,7 @@ class Data_Control():
                 continue
 
             # RBW(상대 밴드폭) 계산
-            rbw = bandwidth / df['bandwidth'].rolling(20).mean().iloc[i]
+            rbw = bandwidth / df['bandwidth'].rolling(60).mean().iloc[i]
             df.loc[i, 'RBW'] = rbw
 
             # MA 트렌드 판별 (새로운 함수 활용)
