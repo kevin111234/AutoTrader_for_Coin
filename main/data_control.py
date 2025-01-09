@@ -498,13 +498,14 @@ class Data_Control():
                                   left_on="Open Time", right_on="fundingTime", direction="backward")
             
             # 필요 없는 열 정리
-            data.drop(columns=["fundingTime", "time"], inplace=True)
+            data.drop(columns=["fundingTime", "symbol", "markPrice"], inplace=True)
 
         return data
     
     def update_data(self, client, symbol, timeframe, existing_data, futures=False, funding_limit=3):
         try:
             # 새 데이터 수집 (3개 캔들 데이터만 요청)
+            symbol = f"{symbol}USDT"
             candles = None
             if futures:
                 candles = client.futures_klines(symbol=symbol, interval=timeframe, limit=3)
@@ -543,7 +544,7 @@ class Data_Control():
                                           left_on="Open Time", right_on="fundingTime", direction="backward")
                 
                 # 필요 없는 열 제거
-                temp_data.drop(columns=["fundingTime", "time"], inplace=True)
+                temp_data.drop(columns=["fundingTime", "symbol", "markPrice"], inplace=True)
 
             ## `Open Time` 기준 병합
             combined_data = pd.concat([existing_data, temp_data]).drop_duplicates(subset="Open Time", keep="last")

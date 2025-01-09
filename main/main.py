@@ -30,6 +30,7 @@ def main():
 
     # 초기 데이터 조회 - data_control.py
     initial_data = {}
+    futures_data = {}
     vp_data = {}
     tpo_data = {}
     for symbol in ticker_list:
@@ -47,7 +48,7 @@ def main():
             data = data_control.cal_obv(data)
 
             # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
-            if timeframe == "1HOUR" or timeframe == "5MINUTE":
+            if timeframe == "1h" or timeframe == "5m":
                 data = data_control.LT_trand_check(data)
 
             # 비어있는 값 제거
@@ -62,6 +63,34 @@ def main():
             
             vp_data[symbol][timeframe] = profile_df
             tpo_data[symbol][timeframe] = sr_levels
+
+        if future_use:
+            for symbol in future_ticker_list:
+                futures_data[symbol] = {}
+                for timeframe in ["1m", "5m", "1h"]:
+                    future_data = data_control.data(client, symbol, timeframe, limit=300, futures=True)
+                    # 각 데이터에 대한 기술적 지표 계산
+                    future_data = data_control.cal_moving_average(future_data)
+                    future_data = data_control.cal_rsi(future_data)
+                    future_data = data_control.cal_bollinger_band(future_data)
+                    future_data = data_control.cal_obv(future_data)
+
+                    # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
+                    if timeframe == "1h" or timeframe == "5m":
+                        future_data = data_control.LT_trand_check(future_data)
+
+                    # 비어있는 값 제거
+                    future_data = future_data.dropna()
+                    
+                    # 데이터 길이는 140개로 제한. (120일 이평선 계산을 위함.)
+                    if len(future_data) > 140:
+                        future_data = future_data.iloc[-140:].reset_index(drop=True)
+                    futures_data[symbol][timeframe] = future_data
+                    # 남은 데이터에 대한 VP, TPO 계산
+                    profile_df, sr_levels = data_control.cal_tpo_volume_profile(future_data)
+                    
+                    vp_data[symbol][timeframe] = profile_df
+                    tpo_data[symbol][timeframe] = sr_levels
 
     # 초기 자산 조회 - notifier.py
     notifier.get_asset_info()
@@ -92,12 +121,11 @@ def main():
                 if ticker == "USDT": # USDT는 스킵
                     continue
                 # 암호화폐 티커 형식 수정 ex) BTCUSDT
-                symbol = str(ticker) + "USDT"
 
                 # 데이터 업데이트. 1분, 5분, 1시간 봉에 대한 업데이트 진행
-                for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
+                for timeframe in ["1m", "5m", "1h"]:
                     initial_data[ticker][timeframe] = data_control.update_data(
-                        client, symbol, timeframe, initial_data[ticker][timeframe]
+                        client, ticker, timeframe, initial_data[ticker][timeframe]
                     )
                     updated_data = initial_data[ticker][timeframe]
                     # 업데이트된 데이터에 대한 기술적 지표 추가
@@ -106,7 +134,7 @@ def main():
                     updated_data = data_control.cal_bollinger_band(updated_data)
                     updated_data = data_control.cal_obv(updated_data)
                     # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가
-                    if timeframe == "1HOUR" or timeframe == "5MINUTE":
+                    if timeframe == "1h" or timeframe == "5m":
                         updated_data = data_control.LT_trand_check(updated_data)
 
                     # TPO/VP 데이터 업데이트
@@ -115,9 +143,34 @@ def main():
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
                     vp_data[ticker][timeframe] = profile_df
                     tpo_data[ticker][timeframe] = sr_levels
+            
+            if future_use:
+                for ticker in future_ticker_list:
+                    for timeframe in ["1m", "5m", "1h"]:
+                        futures_data[ticker][timeframe] = data_control.update_data(
+                            client, ticker, timeframe, futures_data[ticker][timeframe], futures=True
+                        )
+                        updated_data = futures_data[ticker][timeframe]
+                        # 업데이트된 데이터에 대한 기술적 지표 추가
+                        updated_data = data_control.cal_moving_average(updated_data)
+                        updated_data = data_control.cal_rsi(updated_data)
+                        updated_data = data_control.cal_bollinger_band(updated_data)
+                        updated_data = data_control.cal_obv(updated_data)
+                        # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가
+                        if timeframe == "1h" or timeframe == "5m":
+                            updated_data = data_control.LT_trand_check(updated_data)
 
-                # 매수/매도 판단
-                print(initial_data[ticker])
+                        # TPO/VP 데이터 업데이트
+                        futures_data[ticker][timeframe] = updated_data
+                        data = futures_data[ticker][timeframe]
+                        profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
+                        vp_data[ticker][timeframe] = profile_df
+                        tpo_data[ticker][timeframe] = sr_levels
+
+            # 매수/매도 판단
+            print(initial_data)
+            print(futures_data)
+
 
                 # 주문 진행
 
