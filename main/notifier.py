@@ -12,6 +12,10 @@ class Notifier():
         coins = self.config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
         for i in range(len(coins)):
             self.target_coins.append(coins[i])
+        self.future_target_coins = ["USDT", ]
+        future_coins = self.config.futures_coin_tickers.split(" ")
+        for i in range(len(future_coins)):
+            self.future_target_coins.append(coins[i])
 
     def get_asset_info(self):
         """반환 형태 예시
