@@ -456,16 +456,12 @@ class Data_Control():
         return df
 
 
-    def data(self,client,symbol,timeframe, limit = 300):
+    def data(self,client,symbol,timeframe, limit = 300, futures=False):
         symbol = f"{symbol}USDT"
-        if timeframe == "1MINUTE":
-            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
-        elif timeframe == "5MINUTE":
-            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=limit)
-        elif timeframe == "1HOUR":
-            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=limit)
+        if futures:
+            candles = client.futures_klines(symbol=symbol, interval=timeframe, limit=limit)
         else:
-            raise ValueError("Invalid timeframe. Please use '1MINUTE', '5MINUTE', or '1HOUR'.")
+            candles = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
 
         # 새로운 데이터를 DataFrame으로 변환
         data = pd.DataFrame(candles, columns=[
@@ -489,18 +485,31 @@ class Data_Control():
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
         data = data.sort_values(by="Open Time").reset_index(drop=True)
         
+        if futures:
+            # Funding Rate 수집
+            funding_rate = client.futures_funding_rate(symbol=symbol)
+            funding_df = pd.DataFrame(funding_rate)
+            funding_df = funding_df.tail(300)  # 최근 300개의 Funding Rate만 유지
+            funding_df["fundingRate"] = funding_df["fundingRate"].astype(float)
+            funding_df["fundingTime"] = pd.to_datetime(funding_df["fundingTime"], unit='ms')
+            
+            # 5. 데이터 병합 (가장 최근 값으로 병합)
+            data = pd.merge_asof(data.sort_values("Open Time"), funding_df.sort_values("fundingTime"), 
+                                  left_on="Open Time", right_on="fundingTime", direction="backward")
+            
+            # 필요 없는 열 정리
+            data.drop(columns=["fundingTime", "time"], inplace=True)
+
         return data
     
-    def update_data(self, client, symbol, timeframe, existing_data):
+    def update_data(self, client, symbol, timeframe, existing_data, futures=False, funding_limit=3):
         try:
-            if timeframe == "1MINUTE":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=3)
-            elif timeframe == "5MINUTE":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=3)
-            elif timeframe == "1HOUR":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=3)
+            # 새 데이터 수집 (3개 캔들 데이터만 요청)
+            candles = None
+            if futures:
+                candles = client.futures_klines(symbol=symbol, interval=timeframe, limit=3)
             else:
-                raise ValueError("Invalid timeframe")
+                candles = client.get_klines(symbol=symbol, interval=timeframe, limit=3)
 
             # 새로운 데이터를 DataFrame으로 변환
             temp_data = pd.DataFrame(candles, columns=[
@@ -521,6 +530,21 @@ class Data_Control():
             temp_data["Taker Sell Base Asset Volume"] = temp_data["Volume"] - temp_data["Taker Buy Base Asset Volume"]
             temp_data["Open Time"] = pd.to_datetime(temp_data["Open Time"], unit='ms')
             
+            # 선물 데이터에 추가 정보를 병합
+            if futures:
+                # Funding Rate 수집
+                funding_rate = client.futures_funding_rate(symbol=symbol, limit=funding_limit)
+                funding_df = pd.DataFrame(funding_rate)
+                funding_df["fundingRate"] = funding_df["fundingRate"].astype(float)
+                funding_df["fundingTime"] = pd.to_datetime(funding_df["fundingTime"], unit='ms')
+
+                # 데이터 병합
+                temp_data = pd.merge_asof(temp_data.sort_values("Open Time"), funding_df.sort_values("fundingTime"),
+                                          left_on="Open Time", right_on="fundingTime", direction="backward")
+                
+                # 필요 없는 열 제거
+                temp_data.drop(columns=["fundingTime", "time"], inplace=True)
+
             ## `Open Time` 기준 병합
             combined_data = pd.concat([existing_data, temp_data]).drop_duplicates(subset="Open Time", keep="last")
             combined_data = combined_data.sort_values(by="Open Time").reset_index(drop=True)

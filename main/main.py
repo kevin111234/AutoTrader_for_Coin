@@ -11,6 +11,9 @@ def main():
     # Config에서 환경변수 및 고정변수 불러오기
     config = Config()
     ticker_list = config.coin_tickers.split(" ")
+    future_use = bool(config.futures_use)
+    if future_use:
+        future_ticker_list = config.futures_coin_tickers.split(" ")
     client = Client(config.binance_access_key, config.binance_secret_key)
     data_control = Data_Control()
     notifier = Notifier()
@@ -35,7 +38,7 @@ def main():
         tpo_data[symbol] = {}
 
         # 1분봉, 5분봉, 1시간봉 각각 300개의 데이터 조회
-        for timeframe in ["1MINUTE", "5MINUTE", "1HOUR"]:
+        for timeframe in ["1m", "5m", "1h"]:
             data = data_control.data(client, symbol, timeframe, limit=300)
             # 각 데이터에 대한 기술적 지표 계산
             data = data_control.cal_moving_average(data)
