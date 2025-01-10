@@ -30,9 +30,11 @@ def main():
 
     # 초기 데이터 조회 - data_control.py
     initial_data = {}
-    futures_data = {}
     vp_data = {}
     tpo_data = {}
+    futures_data = {}
+    futures_vp_data = {}
+    futures_tpo_data = {}
     for symbol in ticker_list:
         initial_data[symbol] = {}
         vp_data[symbol] = {}
@@ -67,6 +69,8 @@ def main():
         if future_use:
             for symbol in future_ticker_list:
                 futures_data[symbol] = {}
+                futures_vp_data[symbol] = {}
+                futures_tpo_data[symbol] = {}
                 for timeframe in ["1m", "5m", "1h"]:
                     future_data = data_control.data(client, symbol, timeframe, limit=300, futures=True)
                     # 각 데이터에 대한 기술적 지표 계산
@@ -89,8 +93,8 @@ def main():
                     # 남은 데이터에 대한 VP, TPO 계산
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(future_data)
                     
-                    vp_data[symbol][timeframe] = profile_df
-                    tpo_data[symbol][timeframe] = sr_levels
+                    futures_vp_data[symbol][timeframe] = profile_df
+                    futures_tpo_data[symbol][timeframe] = sr_levels
 
     # 초기 자산 조회 - notifier.py
     notifier.get_asset_info()
@@ -105,6 +109,7 @@ def main():
         try:
             # 자산 정보 업데이트
             notifier.get_asset_info()
+            notifier.get_futures_asset_info()
 
             # 보유량 0 체크 (USDT 제외)
             all_zero = all(
@@ -170,14 +175,16 @@ def main():
                         futures_data[ticker][timeframe] = updated_data
                         data = futures_data[ticker][timeframe]
                         profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
-                        vp_data[ticker][timeframe] = profile_df
-                        tpo_data[ticker][timeframe] = sr_levels
+                        futures_vp_data[ticker][timeframe] = profile_df
+                        futures_tpo_data[ticker][timeframe] = sr_levels
 
                         # -------------------------------------------------------------------------
                         # 매수/매도 판단
 
                         # 주문 진행
 
+            print(initial_data)
+            print(futures_data)
             time.sleep(10)
         except Exception as e:
             print(f"메인 루프 오류: {e}")
