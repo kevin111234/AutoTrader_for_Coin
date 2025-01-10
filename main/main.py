@@ -94,9 +94,11 @@ def main():
 
     # 초기 자산 조회 - notifier.py
     notifier.get_asset_info()
-    limit_amount = notifier.get_limit_amount()
+    notifier.get_futures_asset_info()
+    spot_limit_amount = notifier.get_limit_amount()
+    future_limit_amount = notifier.futures_get_limit_amount
 
-    notifier.send_asset_info(limit_amount)
+    notifier.send_asset_info(spot_limit_amount, future_limit_amount)
 
     # 반복문 시작
     while True:
@@ -120,7 +122,6 @@ def main():
             for ticker in ticker_list:
                 if ticker == "USDT": # USDT는 스킵
                     continue
-                # 암호화폐 티커 형식 수정 ex) BTCUSDT
 
                 # 데이터 업데이트. 1분, 5분, 1시간 봉에 대한 업데이트 진행
                 for timeframe in ["1m", "5m", "1h"]:
@@ -143,6 +144,11 @@ def main():
                     profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
                     vp_data[ticker][timeframe] = profile_df
                     tpo_data[ticker][timeframe] = sr_levels
+
+                # -------------------------------------------------------------------------
+                # 매수/매도 판단
+
+                # 주문 진행
             
             if future_use:
                 for ticker in future_ticker_list:
@@ -167,12 +173,10 @@ def main():
                         vp_data[ticker][timeframe] = profile_df
                         tpo_data[ticker][timeframe] = sr_levels
 
-            # 매수/매도 판단
-            print(initial_data)
-            print(futures_data)
+                        # -------------------------------------------------------------------------
+                        # 매수/매도 판단
 
-
-                # 주문 진행
+                        # 주문 진행
 
             time.sleep(10)
         except Exception as e:

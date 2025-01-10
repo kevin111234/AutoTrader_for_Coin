@@ -111,7 +111,55 @@ class Notifier():
 
         except Exception as e:
             print(f"자산 정보 및 수익률 계산 중 오류 발생: {e}")
-    
+
+    def get_futures_asset_info(self):
+        """
+        선물 계좌 정보를 조회하고 self.asset_info에 저장.
+        """
+        try:
+            # 1. 선물 계좌 잔액 조회
+            futures_balances = self.client.futures_account_balance()
+
+            for balance in futures_balances:
+                asset = balance['asset']
+                if asset not in self.future_target_coins:
+                    continue  # future_target_coins에 없는 자산은 건너뛰기
+                
+                balance_amount = float(balance['balance'])
+                withdraw_available = float(balance['withdrawAvailable'])
+
+                # 2. 잔액 정보 저장
+                self.asset_info[asset] = {
+                    "balance": balance_amount,
+                    "withdraw_available": withdraw_available,
+                    "positions": []
+                }
+
+            # 3. 선물 포지션 정보 조회
+            futures_positions = self.client.futures_position_information()
+
+            for position in futures_positions:
+                symbol = position['symbol']
+                if symbol.replace("USDT", "") not in self.future_target_coins:
+                    continue  # 선물 대상 코인에 없는 경우 스킵
+
+                position_amt = float(position['positionAmt'])
+                entry_price = float(position['entryPrice'])
+                unrealized_profit = float(position['unRealizedProfit'])
+                leverage = int(position['leverage'])
+
+                if position_amt != 0:  # 포지션이 있을 경우만 저장
+                    self.asset_info[symbol] = {
+                        "position_amt": position_amt,
+                        "entry_price": entry_price,
+                        "unrealized_profit": unrealized_profit,
+                        "leverage": leverage,
+                        "margin_type": position['marginType']
+                    }
+
+        except Exception as e:
+            print(f"선물 계좌 정보 조회 중 오류 발생: {e}")
+
     def get_limit_amount(self):
         try:
             # 1. USDT 잔액 조회
@@ -180,6 +228,76 @@ class Notifier():
             print(error_msg)
             return {}
 
+    def futures_get_limit_amount(self):
+        """
+        선물 계좌의 투자 한도를 계산하는 함수.
+        """
+        try:
+            # 1. USDT 잔액 조회 (선물 계좌)
+            usdt_balance = float(self.asset_info.get("USDT", {}).get("balance", 0))
+            available_balance = float(self.asset_info.get("USDT", {}).get("withdraw_available", 0))
+
+            # 2. 선물 계좌의 포지션 가치 계산
+            coin_values = {}
+            total_asset = usdt_balance
+
+            for symbol in self.future_target_coins:
+                if symbol == "USDT":
+                    continue
+
+                # 선물 포지션 정보 가져오기
+                position_info = self.asset_info.get(f"{symbol}USDT", {})
+                position_amt = float(position_info.get("position_amt", 0))
+                entry_price = float(position_info.get("entry_price", 0))
+
+                # 포지션 크기 및 가치 계산
+                position_value = abs(position_amt) * entry_price
+                coin_values[symbol] = position_value
+                total_asset += position_value
+
+            # 3. 코인 개수 및 균등 배분 금액 계산
+            coin_count = len(self.future_target_coins) - 1  # USDT 제외
+            if coin_count == 0:
+                raise ValueError("선물 대상 코인이 없습니다.")
+
+            target_amount_per_coin = total_asset / coin_count
+
+            # 4. 매수/매도 가능 금액 계산
+            limit_amounts = {}
+            negative_sum = 0
+            negative_count = 0
+
+            for symbol in self.future_target_coins:
+                if symbol == "USDT":
+                    continue
+
+                # 목표 금액에서 현재 포지션 가치 차감
+                limit_amount = target_amount_per_coin - coin_values.get(symbol, 0)
+
+                # 초과 보유 시 0으로 설정하고, 초과분을 누적
+                if limit_amount < 0:
+                    negative_sum += abs(limit_amount)
+                    negative_count += 1
+                    limit_amounts[symbol] = 0
+                else:
+                    limit_amounts[symbol] = limit_amount
+
+            # 5. 초과 포지션을 다른 코인들에게 분배
+            if negative_count > 0 and coin_count > negative_count:
+                additional_reduction = negative_sum / (coin_count - negative_count)
+                for symbol in self.future_target_coins:
+                    if symbol == "USDT":
+                        continue
+                    if limit_amounts[symbol] > 0:
+                        limit_amounts[symbol] -= additional_reduction
+
+            return limit_amounts
+
+        except Exception as e:
+            error_msg = f"선물 주문 가능 금액 계산 중 오류 발생: {str(e)}"
+            print(error_msg)
+            return {}
+
     def send_slack_message(self, channel_id, message):
         try:
             self.slack.chat_postMessage(channel=channel_id, text=message)
@@ -187,51 +305,84 @@ class Notifier():
             print(f"Error sending message: {e}")
 
     # 자산 정보 전송 함수
-    def send_asset_info(self, limit_amount, position_tracker=""):
-        # USDT 잔액 및 총 자산 계산
-        usdt_balance = self.asset_info.get("USDT", {}).get("total_quantity", 0)
-        total_asset = usdt_balance
-
-        # 메시지 초기 구성
-        message = f"""
-📊 자산 현황 보고
-──────────────
-💰 보유 USDT: {usdt_balance:,.2f} USDT
-──────────────
-{position_tracker}
-──────────────
-"""
-
-        # 각 코인별 평가 금액 및 메시지 생성
-        for symbol, info in self.asset_info.items():
-            if symbol == "USDT":
-                continue  # USDT는 이미 상단에 출력했으므로 제외
-
-            # 평가 금액 및 총 자산 합산
-            coin_value = info['total_quantity'] * info['current_price']
-            total_asset += coin_value
-
-            # 메시지에 코인 정보 추가
-            message += f"""
-🪙 {symbol}:
-수량: {info['total_quantity']:.8f}
-거래 가능 수량: {info['free']:.8f}
-거래 중 잠김: {info['locked']:.8f}
-평균매수가: {info['average_buy_price']:,.2f} USDT
-현재가격: {info['current_price']:,.2f} USDT
-평가금액: {coin_value:,.2f} USDT
-수익률: {info['profit_rate']:.2f}%
-코인별 투자한도: {limit_amount.get(symbol, 0):,.2f} USDT
-──────────────"""
-
-        # 총 자산 및 전체 수익률 계산
-        message += f"""
-💵 총 자산: {total_asset:,.2f} USDT
-💵 전체 수익률: {((float(total_asset) - float(self.config.seed_money)) / float(self.config.seed_money) * 100):.2f}%
-──────────────"""
-
-        # 메시지 전송 (Slack)
+    def send_asset_info(self, spot_limit_amount, futures_limit_amount, position_tracker=""):
+        """
+        현물 및 선물 계좌 정보를 Slack에 전송하는 함수.
+        """
         try:
-            self.send_slack_message(self.config.slack_asset_channel_id, message)
+            # 1. 현물 계좌 정보
+            usdt_balance = self.asset_info.get("USDT", {}).get("total_quantity", 0)
+            total_spot_asset = usdt_balance
+
+            spot_message = f"""
+    📊 현물 계좌 자산 현황
+    ──────────────
+    💰 보유 USDT: {usdt_balance:,.2f} USDT
+    ──────────────
+    """
+
+            # 현물 자산 정보 추가
+            for symbol, info in self.asset_info.items():
+                if symbol == "USDT" or symbol not in self.target_coins:
+                    continue
+
+                coin_value = info["total_quantity"] * info["current_price"]
+                total_spot_asset += coin_value
+
+                spot_message += f"""
+    🪙 {symbol} (현물):
+    수량: {info['total_quantity']:.8f}
+    거래 가능 수량: {info['free']:.8f}
+    거래 중 잠김: {info['locked']:.8f}
+    평균매수가: {info['average_buy_price']:,.2f} USDT
+    현재가격: {info['current_price']:,.2f} USDT
+    평가금액: {coin_value:,.2f} USDT
+    수익률: {info['profit_rate']:.2f}%
+    코인별 투자한도: {spot_limit_amount.get(symbol, 0):,.2f} USDT
+    ──────────────"""
+
+            # 2. 선물 계좌 정보
+            usdt_futures_balance = self.asset_info.get("USDT", {}).get("balance", 0)
+            total_futures_asset = usdt_futures_balance
+
+            futures_message = f"""
+    📊 선물 계좌 자산 현황
+    ──────────────
+    💰 선물 USDT 잔액: {usdt_futures_balance:,.2f} USDT
+    ──────────────
+    """
+
+            # 선물 자산 정보 추가
+            for symbol, info in self.asset_info.items():
+                if "USDT" not in symbol or symbol.replace("USDT", "") not in self.future_target_coins:
+                    continue
+
+                position_value = abs(info.get("position_amt", 0)) * info.get("entry_price", 0)
+                total_futures_asset += position_value
+
+                futures_message += f"""
+    🪙 {symbol} (선물):
+    포지션 크기: {info.get('position_amt', 0):.8f}
+    진입가격: {info.get('entry_price', 0):,.2f} USDT
+    현재 미실현 손익: {info.get('unrealized_profit', 0):,.2f} USDT
+    레버리지: {info.get('leverage', 0)}x
+    포지션 가치: {position_value:,.2f} USDT
+    선물 투자한도: {futures_limit_amount.get(symbol.replace("USDT", ""), 0):,.2f} USDT
+    ──────────────"""
+
+            # 3. 총 자산 및 수익률
+            total_asset = total_spot_asset + total_futures_asset
+            total_message = f"""
+    💵 총 자산 (현물 + 선물): {total_asset:,.2f} USDT
+    💵 전체 수익률: {((float(total_asset) - float(self.config.seed_money)) / float(self.config.seed_money) * 100):.2f}%
+    ──────────────
+    """
+
+            # 4. 최종 메시지 작성
+            full_message = spot_message + position_tracker + futures_message + total_message
+
+            # 5. 메시지 전송
+            self.send_slack_message(self.config.slack_asset_channel_id, full_message)
+
         except Exception as e:
             print(f"자산 보고 오류: {str(e)}")
