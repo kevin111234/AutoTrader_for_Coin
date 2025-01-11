@@ -14,15 +14,19 @@ class Config():
 
         self.seed_money = os.getenv("SEED_MONEY")
         self.coin_tickers = os.getenv("COIN_TICKERS")
-        self.sto_fut_rate = os.getenv("STO_FUT_RATE")
-        self.leverage_rate = os.getenv("LEVERAGE_RATE")
+
+        self.futures_use = os.getenv("FUTURES_USE").lower() == "true"
+        self.futures_leverage = int(os.getenv("FUTURES_LEVERAGE"))
+        self.futures_margin_type = os.getenv("FUTURES_MARGIN_TYPE")
+        self.futures_coin_tickers = os.getenv("FUTURES_COIN_TICKERS")
 
         print("환경변수 로드 완료")
         
+        print("환경변수 검증중...")
         self.verify()
+        print("환경변수 검증 완료!")
 
     def verify(self):
-        print("환경변수 검증중...")
         if not self.binance_access_key:
             raise ValueError("binance access key 환경변수가 제대로 설정되지 않았습니다.")
         elif not self.binance_secret_key:
@@ -39,9 +43,11 @@ class Config():
             raise ValueError("seed money 환경변수가 제대로 설정되지 않았습니다.")
         elif not self.coin_tickers:
             raise ValueError("coin tickers 환경변수가 제대로 설정되지 않았습니다.")
-        elif not self.sto_fut_rate:
-            raise ValueError("sto fut rate 환경변수가 제대로 설정되지 않았습니다.")
-        elif not self.leverage_rate:
-            raise ValueError("leverage rate 환경변수가 제대로 설정되지 않았습니다.")
-        else:
-            print("환경변수 검증 완료!")
+        elif not self.futures_use:
+            raise ValueError("futures_use 환경변수가 제대로 설정되지 않았습니다.")
+        elif not self.futures_leverage:
+            raise ValueError("futures_leverage 환경변수가 제대로 설정되지 않았습니다.")
+        elif not self.futures_margin_type:
+            raise ValueError("futures_margin_type 환경변수가 제대로 설정되지 않았습니다.")
+        elif not self.futures_coin_tickers:
+            raise ValueError("futures_coin_tickers 환경변수가 제대로 설정되지 않았습니다.")

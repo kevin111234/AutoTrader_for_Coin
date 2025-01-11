@@ -5,11 +5,6 @@ import numpy as np
 class Data_Control():
     def __init__(self):
         pass
-
-    def get_current_price(self,client,symbol):
-        price = client.get_symbol_ticker(symbol)
-        current_price = price["price"]
-        return current_price
     
     def cal_moving_average(self, df, period=[20, 60, 120]):
         """
@@ -18,31 +13,27 @@ class Data_Control():
         예: period=[20,60,120] -> ma_20, ma_60, ma_120 열 생성/갱신
         """
         
+        # 예외 처리
+        if 'Close' not in df.columns or df.empty:
+            raise ValueError("DataFrame에 'Close' 열이 없거나 데이터가 없습니다.")
+        
         # period 리스트에 있는 각 기간별로 이동평균선 계산
         for p in period:
             col_name = f"SMA_{p}"
             
-            # (1) SNA_XX 컬럼 없으면 만들기
+            # (1) SMA 컬럼 없으면 생성
             if col_name not in df.columns:
                 df[col_name] = np.nan
             
-            # (2) 이미 계산된 마지막 인덱스 찾기
-            last_valid = df[col_name].last_valid_index()
-            if last_valid is None:
-                last_valid = -1
-            
-            # (3) 마지막 계산 인덱스 + 1부터 끝까지
-            for i in range(last_valid + 1, len(df)):
+            # (2) NaN 부분만 필터링하여 계산
+            nan_indices = df[df[col_name].isna()].index
+            for i in nan_indices:
                 # p일치 안 되면 계산 불가
                 if i < p - 1:
                     continue
                 
-                # 값이 이미 있으면 건너뛰기
-                if not pd.isna(df.loc[i, col_name]):
-                    continue
-                
                 # 직전 p개 구간 mean
-                window_close = df.loc[i - p + 1 : i, 'Close']
+                window_close = df.loc[max(0, i - p + 1) : i, 'Close']
                 df.loc[i, col_name] = window_close.mean()
         
         return df
@@ -115,39 +106,49 @@ class Data_Control():
     
     def cal_bollinger_band(self, df, period=20, num_std=2):
         """
-        data: 'Close' 열이 포함된 pandas DataFrame
-        period: 볼린저 밴드 계산용 이동평균 기간 (기본=20)
-        num_std: 표준편차 배수 (기본=2)
+        볼린저 밴드, %b 및 Bandwidth를 계산하는 함수
+        
+        매개변수:
+        df : pandas DataFrame - 'Close' 열이 포함된 데이터프레임
+        period : int - 볼린저 밴드 이동평균 기간 (기본값 20)
+        num_std : int - 표준편차 배수 (기본값 2)
+        
+        반환:
+        df : pandas DataFrame - 수정된 볼린저 밴드, %b 및 밴드폭 포함
         """
         
-        # 1) 볼린저 컬럼들이 없으면 만들어 둠
+        # 1) 볼린저 및 %b, 밴드폭 컬럼들이 없으면 만들어 둠
         if 'middle_boll' not in df.columns:
             df['middle_boll'] = np.nan
         if 'upper_boll' not in df.columns:
             df['upper_boll'] = np.nan
         if 'lower_boll' not in df.columns:
             df['lower_boll'] = np.nan
+        if 'percent_b' not in df.columns:
+            df['percent_b'] = np.nan
+        if 'bandwidth' not in df.columns:
+            df['bandwidth'] = np.nan
 
-        # 2) 마지막으로 유효한(=NaN이 아닌) 중간선(middle_boll) 인덱스를 찾음
-        #    세 컬럼 중 하나만 봐도 되지만, 여기선 middle_boll 기준으로 예시
+        # 2) 마지막으로 유효한 볼린저밴드 인덱스 확인
         last_valid_boll = df['middle_boll'].last_valid_index()
         if last_valid_boll is None:
-            last_valid_boll = -1  # 전부 NaN이면 -1로 설정해서 0부터 계산
+            last_valid_boll = -1  # NaN이면 -1로 설정해서 처음부터 계산
 
-        # 3) last_valid_boll + 1부터 끝까지 순회
+        # 3) last_valid_boll + 1부터 끝까지 순회하며 볼린저 밴드 및 추가 지표 계산
         for i in range(last_valid_boll + 1, len(df)):
-            # period 미만 구간은 볼린저밴드 계산 불가능 -> skip
+            # period 미만 구간은 볼린저밴드 계산 불가
             if i < period:
                 continue
             
-            # 이미 값이 들어있다면( NaN이 아니라면 ) 건너뛰기
-            # 혹은 middle/upper/lower 중 하나라도 NaN이면 재계산
+            # 볼린저밴드 값이 이미 존재하면 건너뛰기
             if (pd.notna(df.loc[i, 'middle_boll']) and 
                 pd.notna(df.loc[i, 'upper_boll']) and
-                pd.notna(df.loc[i, 'lower_boll'])):
+                pd.notna(df.loc[i, 'lower_boll']) and
+                pd.notna(df.loc[i, 'percent_b']) and
+                pd.notna(df.loc[i, 'bandwidth'])):
                 continue
-            
-            # i번째 행까지 slice해서 rolling
+
+            # i번째까지 슬라이스하여 롤링 평균 및 표준편차 계산
             window_series = df.loc[:i, 'Close'].rolling(period)
             mean_val = window_series.mean().iloc[-1]
             std_val = window_series.std().iloc[-1]
@@ -156,10 +157,19 @@ class Data_Control():
             upper_val = mean_val + num_std * std_val
             lower_val = mean_val - num_std * std_val
 
-            # 해당 인덱스에 기록
+            # %b 계산
+            current_price = df.loc[i, 'Close']
+            percent_b = (current_price - lower_val) / (upper_val - lower_val)
+
+            # 밴드폭(Bandwidth) 계산
+            bandwidth = ((upper_val - lower_val) / mean_val) * 100
+
+            # 결과 반영
             df.loc[i, 'middle_boll'] = mean_val
             df.loc[i, 'upper_boll'] = upper_val
             df.loc[i, 'lower_boll'] = lower_val
+            df.loc[i, 'percent_b'] = percent_b
+            df.loc[i, 'bandwidth'] = bandwidth
 
         return df
 
@@ -294,135 +304,164 @@ class Data_Control():
 
     def LT_trand_check(self, df):
         """
-        기존 LT_trand_check 함수를 '2번 방식' 개념으로 수정:
-        이미 계산된 구간은 건너뛰고, NaN 값만 업데이트.
-
-        data_1HOUR: 반드시
-          - 'SMA_20', 'SMA_60', 'SMA_120'
-          - 'Close', 'Volume'
-        컬럼이 존재한다고 가정.
-        """
-        # 편의상 data_1HOUR를 df로 복사
-        df = df.reset_index(drop=True)
+        상승 및 하락 추세 판단 함수
+        볼린저 밴드 %b 및 Bandwidth 기반으로 추세 분석 강화
+        Relative Bandwidth 계산을 포함하여 추세 전환 가능성까지 감지
         
-        # 1) 필요한 컬럼들이 없으면 새로 만듦(처음 실행 시)
-        needed_cols = [
-            'Spread_20_60', 'Spread_60_120', 'Spread_20_120',
-            'Trend',
-            'Spread_20_60_MA', 'Spread_60_120_MA', 'Spread_20_120_MA'
-        ]
+        매개변수:
+        df : pandas DataFrame - 볼린저 밴드 및 가격 데이터가 포함된 데이터프레임
+        
+        반환:
+        df : pandas DataFrame - Trend 열에 추세 레벨을 반영하여 반환
+        """
+
+        # MA 트렌드 판별 함수
+        def check_ma_trend(sma20, sma60, sma120, rbw):
+            """
+            이동평균선 상태 및 상대 밴드폭(RBW)을 바탕으로 추세 상태를 정수로 매핑하는 함수
+            
+            매개변수:
+            sma20 : float - 20일 이동평균선
+            sma60 : float - 60일 이동평균선
+            sma120 : float - 120일 이동평균선
+            rbw : float - 상대 밴드폭 (Relative Bandwidth)
+            
+            반환:
+            int - 트렌드 상태 (-9 ~ 9)
+            """
+            # 강한 상승 배열 sma120 < sma60 < sma20
+            if sma120 < sma60 < sma20:
+                # 1. 급격한 상승, 과매수 위험 구간
+                if 1.1 < rbw:
+                    return 1
+
+                # 2. 안정적 상승 추세
+                elif 0.8 <= rbw <= 1.1:
+                    return 2
+
+                # 3. 상승 추세에서 조정 가능성
+                elif rbw < 0.8:
+                    return 3
+
+            # 불안정 상승 배열 sma60 < sma120 < sma20
+            elif sma60 < sma120 < sma20:
+                # 4. 상승 반전 시도, 변동성 높음
+                if 1.1 < rbw:
+                    return 4
+
+                # 5. 상승 전환 박스권
+                elif 0.8 <= rbw <= 1.1:
+                    return 5
+
+                # 6. 상승 전환 준비
+                elif rbw < 0.8:
+                    return 6
+
+            # 약세 반등 배열 sma120 < sma20 < sma60
+            elif sma120 < sma20 < sma60:
+                # 7. 일시적 반등, 불안정
+                if 1.1 < rbw:
+                    return 7
+
+                # 8. 약세장 속 반등
+                elif 0.8 <= rbw <= 1.1:
+                    return 8
+
+                # 9. 하락 추세 재진입 가능성
+                elif rbw < 0.8:
+                    return 9
+
+            # 강한 하락 배열 sma20 < sma120 < sma60
+            elif sma20 < sma120 < sma60:
+            # -1. 급격한 하락, 과매도 위험
+                if 1.1 < rbw:
+                    return -1
+
+                # -2. 안정적 하락 추세
+                elif 0.8 <= rbw <= 1.1:
+                    return -2
+
+                # -3. 하락 추세에서 반등 가능성
+                elif rbw < 0.8:
+                    return -3
+
+            # 불안정 하락 배열 sma60 < sma20 < sma120
+            elif sma60 < sma20 < sma120:
+                # -4. 하락 반전 시도, 변동성 높음
+                if 1.1 < rbw:
+                    return -4
+
+                # -5. 하락 전환 박스권
+                elif 0.8 <= rbw <= 1.1:
+                    return -5
+
+                # -6. 하락 전환 준비
+                elif rbw < 0.8:
+                    return -6
+
+            # 급격한 하락 배열 sma20 < sma60 < sma120
+            elif sma20 < sma60 < sma120:
+                # -7. 패닉셀, 과매도 구간 진입 가능성
+                if 1.1 < rbw:
+                    return -7
+
+                # -8. 급락 후 안정화 진행중
+                elif 0.8 <= rbw <=1.1:
+                    return -8
+
+                # -9. 급락 추세 소멸, 기술적 반등 가능성 존재
+                elif rbw < 0.8:
+                    return -9
+
+            # 그 외 상황 (예외적 횡보, 추세 모호)
+            else:
+                return 0
+
+        # 1) 필요한 컬럼들이 없으면 새로 만듦
+        needed_cols = ['Trend', 'RBW']
         for col in needed_cols:
             if col not in df.columns:
                 df[col] = np.nan
 
-        # 2) MA 트렌드 판별 함수
-        def check_ma_trend(sma20, sma60, sma120):
-            if sma20 > sma60 > sma120:
-                return "UpTrend"
-            elif sma20 < sma60 < sma120:
-                return "DownTrend"
-            else:
-                return "SideWays"
-
-        # 3) 추세(Trend) 판별 함수
-        def detect_trend(ma_trend, spread_20_60_diff, obv_diff, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold):
-            """
-            ma_trend: "UpTrend", "DownTrend", "SideWays"
-            spread_20_60_diff: Spread_20_60의 3틱 전 대비 변화량
-            obv_diff: OBV의 3틱 전 대비 변화량
-            """
-            if ma_trend == "UpTrend" and spread_20_60_diff > 0 and obv_diff > 0 and Price_vs_SMA20_1 and Spread_20_60_vs_Threshold:
-                return 3 #"Level 3 UpTrend"
-            elif ma_trend == "UpTrend" and (spread_20_60_diff > 0 or obv_diff > 0) and (Price_vs_SMA20_1 or Spread_20_60_vs_Threshold):
-                return 2 #"Level 2 UpTrend"
-            elif ma_trend == "UpTrend":
-                return 1 #"Level 1 UpTrend"
-            elif ma_trend == "DownTrend" and spread_20_60_diff < 0 and obv_diff < 0 and Price_vs_SMA20_2 and not Spread_20_60_vs_Threshold:
-                return -3 #"Level 3 DownTrend"
-            elif ma_trend == "DownTrend" and (spread_20_60_diff < 0 or obv_diff < 0) and (Price_vs_SMA20_2 or not Spread_20_60_vs_Threshold):
-                return -2 #"Level 2 DownTrend"
-            elif ma_trend == "DownTrend":
-                return -1 #"Level 1 DownTrend"
-            else:
-                return 0 #"SideWays"
-
-        # 4) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
-        #    이미 Trend가 채워져 있는 구간은 건너뛴다는 개념
+        # 2) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
         last_valid = df['Trend'].last_valid_index()
         if last_valid is None:
-            last_valid = -1  # 전부 NaN이면 -1로
+            last_valid = -1  # 전부 NaN이면 -1로 설정
 
-        # 5) for문으로 (마지막 유효인덱스 + 1) ~ 끝까지 순회
+        # 3) MA 트렌드 및 횡보 상태 판별
         for i in range(last_valid + 1, len(df)):
-            # 이미 Trend가 있으면( NaN이 아니면 ) 건너뛰기
             if pd.notna(df.loc[i, 'Trend']):
                 continue
             
-            # =============== (1) MA_Trend 판별 ===============
+            # 이동평균선 데이터
             sma20 = df.loc[i, 'SMA_20']
             sma60 = df.loc[i, 'SMA_60']
             sma120 = df.loc[i, 'SMA_120']
-            close_price = df.loc[i, 'Close']
-            
-            # 값이 하나라도 NaN이면 트렌드 판단 불가
-            if pd.isna(sma20) or pd.isna(sma60) or pd.isna(sma120):
+            bandwidth = df.loc[i, 'bandwidth']
+
+            # 데이터 누락 시 건너뛰기
+            if pd.isna(sma20) or pd.isna(sma60) or pd.isna(sma120) or pd.isna(bandwidth):
                 continue
-            
-            # MA_Trend 업데이트
-            MA_Trend = check_ma_trend(sma20, sma60, sma120)
 
-            # =============== (2) Spread 계산 ===============
-            df.loc[i, 'Spread_20_60']  = sma20 - sma60
-            df.loc[i, 'Spread_60_120'] = sma60 - sma120
-            df.loc[i, 'Spread_20_120'] = sma20 - sma120
-            df.loc[i, 'Spread_20_60_MA'] = df.loc[i-19:i, 'Spread_20_60'].mean()
-            df.loc[i, 'Spread_60_120_MA'] = df.loc[i-19:i, 'Spread_60_120'].mean()
-            df.loc[i, 'Spread_20_120_MA'] = df.loc[i-19:i, 'Spread_20_120'].mean()
+            # RBW(상대 밴드폭) 계산
+            rbw = bandwidth / df['bandwidth'].rolling(60).mean().iloc[i]
+            df.loc[i, 'RBW'] = rbw
 
-            # 가격과 20일 이동평균선 비교
-            Price_vs_SMA20_1 = close_price > sma20*1.25 
-            Price_vs_SMA20_2 = close_price < sma20*0.75 
+            # MA 트렌드 판별 (새로운 함수 활용)
+            trend_state = check_ma_trend(sma20, sma60, sma120, rbw)
 
-            # 20일과 60일 이동평균선의 편차 확인
-            Spread_20_60_vs_Threshold = df.loc[i, 'Spread_20_60'] > df.loc[i, 'Spread_20_60_MA']
-
-            # =============== (3) Spread 기울기(3틱 전 대비 차이) ===============
-            # i-3 >= 0 일 때만 계산 가능
-            if i >= 3:
-                Spread_20_60_diff  = df.loc[i, 'Spread_20_60']  - df.loc[i-3, 'Spread_20_60']
-                # Spread_60_120_diff = df.loc[i, 'Spread_60_120'] - df.loc[i-3, 'Spread_60_120']
-                # Spread_20_120_diff = df.loc[i, 'Spread_20_120'] - df.loc[i-3, 'Spread_20_120']
-            else:
-                Spread_20_60_diff = np.nan
-            
-            # =============== (5) OBV 기울기(3틱 전 대비 차이) ===============
-            if i >= 3 and not pd.isna(df.loc[i, 'obv']) and not pd.isna(df.loc[i-3, 'obv']):
-                OBV_diff = df.loc[i, 'obv'] - df.loc[i-3, 'obv']
-            else:
-                OBV_diff = np.nan
-
-            # =============== (6) 최종 Trend 판별 ===============
-            # MA_Trend, Spread_20_60_diff, OBV_diff 중 하나라도 NaN이면 판별 불가
-            if pd.isna(MA_Trend) or pd.isna(Spread_20_60_diff) or pd.isna(OBV_diff):
-                # 아직 3틱 안 됐거나, 필요한 값이 NaN이면 Trend를 구할 수 없음
-                continue
-            
-            # Trend 업데이트
-            df.loc[i, 'Trend'] = detect_trend(MA_Trend, Spread_20_60_diff, OBV_diff, Price_vs_SMA20_1, Price_vs_SMA20_2, Spread_20_60_vs_Threshold)
+            # Trend 컬럼에 상태 업데이트
+            df.loc[i, 'Trend'] = trend_state
 
         return df
 
 
-    def data(self,client,symbol,timeframe, limit = 300):
-        
-        if timeframe == "1MINUTE":
-            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=limit)
-        elif timeframe == "5MINUTE":
-            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=limit)
-        elif timeframe == "1HOUR":
-            candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=limit)
+    def data(self,client,symbol,timeframe, limit = 300, futures=False):
+        symbol = f"{symbol}USDT"
+        if futures:
+            candles = client.futures_klines(symbol=symbol, interval=timeframe, limit=limit)
         else:
-            raise ValueError("Invalid timeframe. Please use '1MINUTE', '5MINUTE', or '1HOUR'.")
+            candles = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
 
         # 새로운 데이터를 DataFrame으로 변환
         data = pd.DataFrame(candles, columns=[
@@ -446,18 +485,32 @@ class Data_Control():
         data["Open Time"] = pd.to_datetime(data["Open Time"], unit='ms')  # 시간 변환
         data = data.sort_values(by="Open Time").reset_index(drop=True)
         
+        if futures:
+            # Funding Rate 수집
+            funding_rate = client.futures_funding_rate(symbol=symbol)
+            funding_df = pd.DataFrame(funding_rate)
+            funding_df = funding_df.tail(300)  # 최근 300개의 Funding Rate만 유지
+            funding_df["fundingRate"] = funding_df["fundingRate"].astype(float)
+            funding_df["fundingTime"] = pd.to_datetime(funding_df["fundingTime"], unit='ms')
+            
+            # 5. 데이터 병합 (가장 최근 값으로 병합)
+            data = pd.merge_asof(data.sort_values("Open Time"), funding_df.sort_values("fundingTime"), 
+                                  left_on="Open Time", right_on="fundingTime", direction="backward")
+            
+            # 필요 없는 열 정리
+            data.drop(columns=["fundingTime", "symbol", "markPrice"], inplace=True)
+
         return data
     
-    def update_data(self, client, symbol, timeframe, existing_data):
+    def update_data(self, client, symbol, timeframe, existing_data, futures=False, funding_limit=3):
         try:
-            if timeframe == "1MINUTE":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE, limit=3)
-            elif timeframe == "5MINUTE":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_5MINUTE, limit=3)
-            elif timeframe == "1HOUR":
-                candles = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1HOUR, limit=3)
+            # 새 데이터 수집 (3개 캔들 데이터만 요청)
+            symbol = f"{symbol}USDT"
+            candles = None
+            if futures:
+                candles = client.futures_klines(symbol=symbol, interval=timeframe, limit=3)
             else:
-                raise ValueError("Invalid timeframe")
+                candles = client.get_klines(symbol=symbol, interval=timeframe, limit=3)
 
             # 새로운 데이터를 DataFrame으로 변환
             temp_data = pd.DataFrame(candles, columns=[
@@ -478,6 +531,21 @@ class Data_Control():
             temp_data["Taker Sell Base Asset Volume"] = temp_data["Volume"] - temp_data["Taker Buy Base Asset Volume"]
             temp_data["Open Time"] = pd.to_datetime(temp_data["Open Time"], unit='ms')
             
+            # 선물 데이터에 추가 정보를 병합
+            if futures:
+                # Funding Rate 수집
+                funding_rate = client.futures_funding_rate(symbol=symbol, limit=funding_limit)
+                funding_df = pd.DataFrame(funding_rate)
+                funding_df["fundingRate"] = funding_df["fundingRate"].astype(float)
+                funding_df["fundingTime"] = pd.to_datetime(funding_df["fundingTime"], unit='ms')
+
+                # 데이터 병합
+                temp_data = pd.merge_asof(temp_data.sort_values("Open Time"), funding_df.sort_values("fundingTime"),
+                                          left_on="Open Time", right_on="fundingTime", direction="backward")
+                
+                # 필요 없는 열 제거
+                temp_data.drop(columns=["fundingTime", "symbol", "markPrice"], inplace=True)
+
             ## `Open Time` 기준 병합
             combined_data = pd.concat([existing_data, temp_data]).drop_duplicates(subset="Open Time", keep="last")
             combined_data = combined_data.sort_values(by="Open Time").reset_index(drop=True)

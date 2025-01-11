@@ -2,6 +2,18 @@
 
 --------------------------------------------
 # 환경변수 설정
+1. BINANCE_ACCESS_KEY = 바이낸스 api key
+2. BINANCE_SECRET_KEY = 바이낸스 secret key
+3. SLACK_API_KEY = 슬랙 봇 api token
+4. SLACK_ASSET_CHANNEL_ID = 자산 정보를 전송할 슬랙 채널 ID
+5. SLACK_TRADE_CHANNEL_ID = 매매 정보를 전송할 슬랙 채널 ID
+6. SLACK_ERROR_CHANNEL_ID = 에러 정보를 전송할 슬랙 채널 ID
+API 설정에 대한 정보는 [[https://woghd-dev.tistory.com/19](https://woghd-dev.tistory.com/19)]참고
+
+7. SEED_MONEY = 시드머니(수익률 계산용)
+8. COIN_TICKERS = 매매하고자 하는 코인 티커(ex- USDT-BTC = 테더로 비트코인을 사겠다)(공백으로 구분)
+9. STO_FUT_RATE = 현물/선물 거래 비율(공백으로 구분)
+10. LEVERAGE_RATE = 레버리지 비율(숫자만 작성)
 
 # 디렉토리 구조
   
@@ -28,8 +40,25 @@
 | **Bollinger_Lower**              | 볼린저밴드 하단                                               | float64        |
 | **Bollinger_BW**                 | 볼린저밴드 폭 (Upper - Lower)                                | float64        |
 | **OBV**                          | 온밸런스 볼륨 (On-Balance Volume)                            | float64        |
+| **Spread_20_60**                 | 20일 SMA와 60일 SMA 간의 차이                               | float64        |
+| **Spread_60_120**                | 60일 SMA와 120일 SMA 간의 차이                              | float64        |
+| **Spread_20_120**                | 20일 SMA와 120일 SMA 간의 차이                              | float64        |
+| **Spread_20_60_MA**              | Spread_20_60의 이동평균                                    | float64        |
+| **Spread_60_120_MA**             | Spread_60_120의 이동평균                                   | float64        |
+| **Spread_20_120_MA**             | Spread_20_120의 이동평균                                   | float64        |
+| **Trend**                        | 추세 상태 (7단계: -3 ~ 3)                                  | int            |
 
 - **단위:** `Open Time`은 밀리초(ms) 단위로 제공되며, 데이터프레임에서 `pd.to_datetime()`을 통해 datetime 형식으로 변환됩니다.  
+
+### **Trend 칼럼 단계별 설명:**
+- **-3**: 강한 하락 추세  
+- **-2**: 중간 하락 추세  
+- **-1**: 약한 하락 추세  
+- **0**: 횡보 추세  
+- **1**: 약한 상승 추세  
+- **2**: 중간 상승 추세  
+- **3**: 강한 상승 추세  
+
 ---
   
 ### **볼륨 프로파일 및 TPO 프로파일 (cal_tpo_volume_profile)**  
@@ -53,20 +82,3 @@
 - 상위 3개의 구간을 잠재적인 지지/저항 구간으로 설정합니다.  
   
 ---
-  
-### **데이터 수량 및 처리 흐름**  
-  
-- **초기 수집 데이터:** 230개 (최대)  
-- **업데이트 데이터:** 23개 (최근 데이터만 추가)  
-- **최종 저장 데이터:** 최근 100개의 데이터 유지  
-  
-- **시간 주기별 데이터:**  
-  - `1MINUTE` (1분봉)  
-  - `5MINUTE` (5분봉)  
-  - `1HOUR` (1시간봉)  
-  
-- **데이터 처리 과정:**  
-  1. 바이낸스 API에서 초기 데이터 수집 (230개)  
-  2. 기술적 지표(SMA, RSI, Bollinger Band, OBV) 계산  
-  3. 주기적으로 최신 데이터(23개)를 불러와 기존 데이터와 병합  
-  4. 데이터 길이가 100개를 초과할 경우, 최근 100개만 유지
