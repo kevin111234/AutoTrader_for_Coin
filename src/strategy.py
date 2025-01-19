@@ -6,107 +6,132 @@ class Strategy():
       pass
 
     def signal(self, 
-                df,
+                data_dict,
                 rsi_buy_threshold=30,
                 rsi_sell_threshold=70,
                 ratio_bullish=1.2,
                 ratio_bearish=0.8,
                 obv_lookback=10):
         """
-        df의 마지막 행 데이터를 참조하여 매매 시그널을 문자열로 반환하는 함수 예시.
-        이 버전에서는 OBV 변화량을 '최근 obv_lookback(기본=10)개 봉의 평균 OBV'와
-        현재 OBV를 비교하여 증가/감소를 판단합니다.
-
-        매개변수:
-        - df: DataFrame(혹은 2D 구조), df[-1, "컬럼명"] 식으로 인덱싱 가능한 형태
-        - rsi_buy_threshold: RSI가 이 값 이하이면 과매도 판단 (기본 30)
-        - rsi_sell_threshold: RSI가 이 값 이상이면 과매수 판단 (기본 70)
-        - ratio_bullish: Taker Buy / Taker Sell이 이 값보다 크면 매수 우위 (기본 1.2)
-        - ratio_bearish: Taker Buy / Taker Sell이 이 값보다 작으면 매도 우위 (기본 0.8)
-        - obv_lookback: OBV 비교 시 사용할 봉 개수 (기본 10)
-
-        반환:
-        - signal: str
-            "BUY", "SELL", "HOLD" 등 매매 시그널
+        data_dict: {
+            "1m": DataFrame(...),
+            "5m": DataFrame(...),
+            "1h": DataFrame(...)
+            # 필요하면 다른 타임프레임도 추가
+        }
+        각 DataFrame은 다음 컬럼을 포함한다고 가정:
+        [Open Time, Open, High, Low, Close, Volume, Taker Buy Base Asset Volume, Taker Sell Base Asset Volume,
+          SMA_20, SMA_60, SMA_120, rsi, rsi_signal, middle_boll, upper_boll, lower_boll, persent_b, bandwidth, obv]
         """
 
-        # 만약 데이터 길이가 obv_lookback+1보다 짧으면 비교가 어려우므로 HOLD 처리
-        if len(df) < obv_lookback + 1:
-            return "HOLD"
+        def get_trend_info(df):
+            """
+            df: trend 칼럼이 있는 데이터프레임 (예: 5분봉, 1시간봉 등)
+            반환:
+              current_trend: 가장 최근 봉의 추세
+              previous_trend: 해당 추세로 바뀌기 직전 봉의 추세
+              bars_since_change: 추세 변환 후 몇 개의 봉이 지났는지
+            """
+            current_trend = df["trend"].iloc[-1]
+            i = len(df) - 2
 
-        # 1) 마지막 행(현재 봉)의 Taker Buy / Sell Volume
-        taker_buy = df[-1, "Taker Buy Base Asset Volume"]
-        taker_sell = df[-1, "Taker Sell Base Asset Volume"]
-        # 분모가 0이 되지 않도록 작은 값 추가
-        tb_ts_ratio = taker_buy / (taker_sell + 1e-9)
+            # 마지막에서부터 거슬러 올라가며 현재 추세와 달라진 지점 탐색
+            while i >= 0 and df["trend"].iloc[i] == current_trend:
+                i -= 1
 
-        # 2) RSI, Trend, OBV
-        rsi = df[-1, "RSI"]
-        trend_score = df[-1, "Trend"]
-        obv_now = df[-1, "OBV"]
+            # 전체가 같은 추세였으면 previous_trend는 None 처리
+            if i < 0:
+                previous_trend = None
+                bars_since_change = len(df) - 1
+            else:
+                previous_trend = df["trend"].iloc[i]
+                bars_since_change = (len(df) - 1) - i
 
-        # 3) 최근 obv_lookback개 봉의 평균 OBV (마지막 봉은 제외)
-        # 예: obv_lookback=10 → 바로 직전 10개 봉 사용
-        # df[-(obv_lookback+1):-1, "OBV"]는 '현재 봉 이전 10개 OBV'를 의미
-        obv_history = df[-(obv_lookback+1):-1, "OBV"]  # 시리즈 형태라고 가정
-        obv_10_mean = obv_history.mean()
+            return current_trend, previous_trend, bars_since_change
 
-        # 4) obv_change: (현재 OBV - 최근 10봉 평균 OBV)
-        obv_change = obv_now - obv_10_mean
+        # 1) 필요한 데이터 꺼내기
+        df_1m = data_dict["1m"]
+        df_5m = data_dict["5m"]
+        df_1h = data_dict["1h"]
 
-        # OBV가 10봉 평균보다 높다면 "OBV 증가", 낮다면 "OBV 감소"로 해석
-        # 예: obv_change > 0 → OBV 증가, obv_change < 0 → OBV 감소
-        # 여기선 간단히 +면 증가, -면 감소로만 사용
+        # 2) 추세 정보 구하기
+        current_trend_5m, previous_trend_5m, bars_since_5m = get_trend_info(df_5m)
+        current_trend_1h, previous_trend_1h, bars_since_1h = get_trend_info(df_1h)
 
-        # 5) signal 초기값
-        signal = "HOLD"
+        # 여기서는 단순히 5분, 1시간 중 “더 극단적인” 추세(절댓값 큰 쪽)를 선택
+        if abs(current_trend_5m) > abs(current_trend_1h):
+            trend_score = current_trend_5m
+        else:
+            trend_score = current_trend_1h
 
-        # 기본 신호 및 비중 초기화
+        # 3) 보조 지표(1분봉 RSI, OBV 등)
+        last_1m = df_1m.iloc[-1]
+        rsi_current = last_1m["rsi"]
+        obv_current = last_1m["obv"]
+        obv_past = df_1m["obv"].iloc[-1 - obv_lookback]
+        obv_diff = obv_current - obv_past
+
+        # 4) 기본 시그널과 가중치
         signal_type = "hold"
-        weight = 0.0
+        weight = 0
 
-        # 추세 점수별 조건
         if trend_score == 9:
-            # 매우 강한 상승 추세
             signal_type = "buy"
-            weight = 1.0
-
+            weight = 5
         elif trend_score == 8:
-            # 강한 상승 추세
             signal_type = "buy"
-            weight = 0.6
-
+            weight = 4
         elif trend_score == 7:
-            # 상승 추세
             signal_type = "buy"
-            weight = 0.4
-
+            weight = 2
         elif trend_score == 0:
-            # 중립 추세
             signal_type = "hold"
-            weight = 0.0
-
+            weight = 0
         elif trend_score == -7:
-            # 하락 추세
             signal_type = "sell"
-            weight = 0.4
-
+            weight = 2
         elif trend_score == -8:
-            # 강한 하락 추세
             signal_type = "sell"
-            weight = 0.6
-
+            weight = 3
         elif trend_score == -9:
-            # 매우 강한 하락 추세
             signal_type = "sell"
-            weight = 1.0
-
-        # 기본: 설정되지 않은 경우 대기
+            weight = 5
         else:
             signal_type = "hold"
-            weight = 0.0
+            weight = 0
 
-        return {"signal": signal_type, "weight": weight}
+        # 5) RSI, OBV 등으로 시그널 보정 예시
+        if signal_type == "buy":
+            if rsi_current > rsi_sell_threshold:
+                weight -= 1
+            if obv_diff > 0:
+                weight += 1
+        elif signal_type == "sell":
+            if rsi_current < rsi_buy_threshold:
+                weight -= 1
+            if obv_diff < 0:
+                weight += 1
+
+        weight = max(weight, 0)
+
+        # 6) 필요하다면 이전 추세나 변환 후 지난 봉 수(bars_since_5m, bars_since_1h)를 활용해
+        #    추가 조건을 걸 수도 있음
+        #    (예: 추세 전환 직후에는 신호를 보수적으로 해석 등)
+        # 예시:
+        if bars_since_5m <= 2 or bars_since_1h <= 1:
+            # 막 추세가 바뀌었으면 시그널 가중치 줄이는 식
+            weight = max(weight - 1, 0)
+
+        return {
+            "signal": signal_type,
+            "weight": weight,
+            "current_trend_5m": current_trend_5m,
+            "previous_trend_5m": previous_trend_5m,
+            "bars_since_5m": bars_since_5m,
+            "current_trend_1h": current_trend_1h,
+            "previous_trend_1h": previous_trend_1h,
+            "bars_since_1h": bars_since_1h
+        }
 
 class Position_Tracker:
     def __init__(self):
