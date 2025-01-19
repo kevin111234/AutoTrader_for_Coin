@@ -39,20 +39,26 @@ class Strategy():
 
         trend_score = current_trend_5m
 
-        # 3) 보조 지표(1분봉 RSI, OBV 등)
+        # 3-1) 보조 지표(1분봉 RSI, OBV 등)
         last_1m = df_1m.iloc[-1]
         rsi_1m = last_1m["rsi"]
         obv_1m = last_1m["obv"]
         obv_past_1m = df_1m["obv"].iloc[-1 - obv_lookback]
         obv_diff_1m = obv_1m - obv_past_1m
 
+        # 3-2) 보조 지표(5분봉 RSI, OBV 등)
+        last_5m = df_5m.iloc[-1]
+        rsi_5m = last_5m["rsi"]
+        obv_5m = last_5m["obv"]
+        obv_past_5m = df_5m["obv"].iloc[-1 - obv_lookback]
+        obv_diff_5m = obv_5m - obv_past_5m
+
         # 4) 기본 시그널과 가중치
         signal_type = "hold"
         weight = 0
 
-        if trend_score == 9:
-            signal_type = "buy"
-            weight = 5
+        if trend_score == 1:
+            signal, weight, reason = utils.trend1_signal(current_trend_1h, rsi_1m, obv_1m, obv_past_1m, rsi_5m, obv_5m, obv_past_5m)
         elif trend_score == 8:
             signal_type = "buy"
             weight = 4
