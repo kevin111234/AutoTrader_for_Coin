@@ -48,10 +48,7 @@ def main():
             data = data_control.cal_rsi(data)
             data = data_control.cal_bollinger_band(data)
             data = data_control.cal_obv(data)
-
-            # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
-            if timeframe == "1h" or timeframe == "5m":
-                data = data_control.LT_trand_check(data)
+            data = data_control.LT_trand_check(data)
 
             # 비어있는 값 제거
             data = data.dropna()
@@ -78,10 +75,7 @@ def main():
                     future_data = data_control.cal_rsi(future_data)
                     future_data = data_control.cal_bollinger_band(future_data)
                     future_data = data_control.cal_obv(future_data)
-
-                    # 1시간봉, 5분봉에 대한 추세 분석 지표 추가
-                    if timeframe == "1h" or timeframe == "5m":
-                        future_data = data_control.LT_trand_check(future_data)
+                    future_data = data_control.LT_trand_check(future_data)
 
                     # 비어있는 값 제거
                     future_data = future_data.dropna()
@@ -139,9 +133,7 @@ def main():
                     updated_data = data_control.cal_rsi(updated_data)
                     updated_data = data_control.cal_bollinger_band(updated_data)
                     updated_data = data_control.cal_obv(updated_data)
-                    # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가
-                    if timeframe == "1h" or timeframe == "5m":
-                        updated_data = data_control.LT_trand_check(updated_data)
+                    updated_data = data_control.LT_trand_check(updated_data)
 
                     # TPO/VP 데이터 업데이트
                     initial_data[ticker][timeframe] = updated_data
@@ -167,9 +159,7 @@ def main():
                         updated_data = data_control.cal_rsi(updated_data)
                         updated_data = data_control.cal_bollinger_band(updated_data)
                         updated_data = data_control.cal_obv(updated_data)
-                        # 만약 1시간봉/5분봉인 경우 트렌드 체크 추가
-                        if timeframe == "1h" or timeframe == "5m":
-                            updated_data = data_control.LT_trand_check(updated_data)
+                        updated_data = data_control.LT_trand_check(updated_data)
 
                         # TPO/VP 데이터 업데이트
                         futures_data[ticker][timeframe] = updated_data
