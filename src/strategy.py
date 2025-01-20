@@ -34,6 +34,7 @@ class Strategy():
         df_1h = data_dict["1h"]
 
         # 2) 추세 정보 구하기
+        current_trend_1m, previous_trend_1m, bars_since_1m = utils.get_trend_info(df_1m)
         current_trend_5m, previous_trend_5m, bars_since_5m = utils.get_trend_info(df_5m)
         current_trend_1h, previous_trend_1h, bars_since_1h = utils.get_trend_info(df_1h)
 
@@ -54,36 +55,20 @@ class Strategy():
         obv_diff_5m = obv_5m - obv_past_5m
 
         # 4) 기본 시그널과 가중치
-        signal_type = "hold"
+        signal = "hold"
         weight = 0
 
         if trend_score == 1:
             signal, weight, reason = utils.trend1_signal(current_trend_1h, rsi_1m, obv_1m, obv_past_1m, rsi_5m, obv_5m, obv_past_5m)
-        elif trend_score == 8:
-            signal_type = "buy"
-            weight = 4
-        elif trend_score == 7:
-            signal_type = "buy"
-            weight = 2
-        elif trend_score == 0:
-            signal_type = "hold"
-            weight = 0
-        elif trend_score == -7:
-            signal_type = "sell"
-            weight = 2
-        elif trend_score == -8:
-            signal_type = "sell"
-            weight = 3
-        elif trend_score == -9:
-            signal_type = "sell"
-            weight = 5
-        else:
-            signal_type = "hold"
-            weight = 0
+        elif trend_score == 2:
+            signal, weight, reason = utils.trend2_signal(current_trend_1h, rsi_1m, obv_1m, obv_past_1m, rsi_5m, obv_5m, obv_past_5m)
+
 
         return {
-            "signal": signal_type,
+            "signal": signal,
             "weight": weight,
+            "reason": reason,
+            "current_trend_1m": current_trend_1m,
             "current_trend_5m": current_trend_5m,
             "current_trend_1h": current_trend_1h,
         }
