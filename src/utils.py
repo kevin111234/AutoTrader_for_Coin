@@ -43,7 +43,6 @@ def trend1_signal(
     5분봉 추세가 1일 때 매수/매도 결정 + 비중(0~5단계) 예시 함수
 
     인자:
-      trend_5m (int): 5분봉 추세 점수 (가정: 1이 전달됨)
       trend_1h (int): 1시간봉 추세 점수 (중기 추세 참고)
       rsi_1m (float): 1분봉 RSI
       obv_1m (float): 1분봉 OBV(최근 값)
