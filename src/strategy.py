@@ -54,14 +54,63 @@ class Strategy():
         obv_past_5m = df_5m["obv"].iloc[-1 - obv_lookback]
         obv_diff_5m = obv_5m - obv_past_5m
 
+        # volume_ratio 계산 (현재 거래량 / 이전 5봉 평균)
+        avg_volume_5 = df_5m["Volume"].iloc[-6:-1].mean()  # 이전 5봉 평균
+        volume_ratio = last_5m["Volume"] / avg_volume_5 if avg_volume_5 != 0 else 0
+
+        # buy_volume_ratio 계산 (매수 거래량 비율)
+        buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"] if last_5m["Volume"] != 0 else 0
+
         # 4) 기본 시그널과 가중치
         signal = "hold"
         weight = 0
 
         if trend_score == 1:
-            signal, weight, reason = utils.trend1_signal(current_trend_1h, rsi_1m, obv_1m, obv_past_1m, rsi_5m, obv_5m, obv_past_5m)
+            # trend1_signal 호출 수정
+            signal, weight, reason = utils.trend1_signal(
+                trend_1m=current_trend_1m,
+                current_price=last_5m["Close"],
+                sma20_5m=last_5m["SMA_20"],
+                rsi_1m=rsi_1m,
+                prev_rsi_1m=df_1m["rsi"].iloc[-2],  # 이전 1분봉 RSI
+                obv_1m=obv_1m,
+                obv_1m_prev=df_1m["obv"].iloc[-2],  # 이전 1분봉 OBV
+                rsi_5m=rsi_5m,
+                prev_rsi_5m=df_5m["rsi"].iloc[-2],  # 이전 5분봉 RSI
+                percent_b=last_5m["percent_b"],
+                volume_ratio=volume_ratio,           # 계산 필요
+                buy_volume_ratio=buy_volume_ratio    # 계산 필요
+            )
         elif trend_score == 2:
-            signal, weight, reason = utils.trend2_signal(current_trend_1h, rsi_1m, obv_1m, obv_past_1m, rsi_5m, obv_5m, obv_past_5m)
+            # trend2_signal 호출 수정
+            signal, weight, reason = utils.trend2_signal(
+                trend_1m=current_trend_1m,
+                current_price=last_5m["Close"],
+                sma20_5m=last_5m["SMA_20"],
+                rsi_1m=rsi_1m,
+                prev_rsi_1m=df_1m["rsi"].iloc[-2],
+                obv_1m=obv_1m,
+                obv_1m_prev=df_1m["obv"].iloc[-2],
+                rsi_5m=rsi_5m,
+                prev_rsi_5m=df_5m["rsi"].iloc[-2],
+                percent_b=last_5m["percent_b"],
+                volume_ratio=volume_ratio,
+                buy_volume_ratio=buy_volume_ratio
+            )
+        elif trend_score == 3:
+            # trend3_signal 호출 추가
+            signal, weight, reason = utils.trend3_signal(
+                trend_1m=current_trend_1m,
+                current_price=last_5m["Close"],
+                sma20_5m=last_5m["SMA_20"],
+                rsi_5m=rsi_5m,
+                prev_rsi_5m=df_5m["rsi"].iloc[-2],
+                percent_b=last_5m["percent_b"],
+                volume_ratio=volume_ratio,
+                buy_volume_ratio=buy_volume_ratio,
+                obv_1m=obv_1m,
+                obv_1m_prev=df_1m["obv"].iloc[-2]
+            )
 
 
         return {
