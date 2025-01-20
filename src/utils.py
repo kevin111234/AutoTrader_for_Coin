@@ -261,3 +261,125 @@ def trend2_signal(
             reason = ["매도제한:강한상승지속"]
 
     return action, weight, " + ".join(reason)
+
+def trend3_signal(
+    # 추세 정보
+    trend_1m,         # 1분봉 추세
+    
+    # 가격 정보
+    current_price,    # 현재가
+    sma20_5m,        # 5분봉 20이평
+    
+    # 5분봉 지표
+    rsi_5m,          # 5분봉 현재 RSI
+    prev_rsi_5m,     # 5분봉 이전 RSI
+    percent_b,       # 5분봉 %B
+    
+    # 거래량 지표
+    volume_ratio,    # 거래량 비율 (현재/이전5봉평균)
+    buy_volume_ratio,# 매수 거래량 비율
+    obv_1m,          # 1분봉 현재 OBV
+    obv_1m_prev      # 1분봉 이전 OBV
+):
+    """
+    추세 3번 상태(상승 추세 내 조정 + 낮은 변동성)의 매매 시그널
+    """
+    action = "hold"
+    weight = 0
+    reason = []
+
+    # 1. 전량 매도 조건 (가중치 5) 체크
+    if (
+        # 1-1. 과매수 해소 + 하락 전환
+        (prev_rsi_5m >= 70 and          # 이전 5분봉 과매수
+        rsi_5m < 70 and                # 과매수 해소 진입
+        trend_1m < 0) or               # 하락 전환
+        
+        # 1-2. 핵심 지지선 붕괴
+        (current_price < sma20_5m and    # 20이평 하향 돌파
+        volume_ratio >= 2.0 and         # 거래량 급증
+        buy_volume_ratio <= 0.4 and     # 매도세 우위
+        obv_1m < obv_1m_prev * 0.97)    # OBV 3% 이상 감소
+    ):
+        action = "sell"
+        weight = 5
+        reason.append("전량매도: 과매수해소/지지선붕괴")
+
+    # 2. 부분 매도 조건 (가중치 3) 체크
+    elif (
+        current_price > sma20_5m * 1.015 and  # 이격도 1.5% 이상
+        trend_1m < 0 and                      # 하락 전환
+        volume_ratio < 0.8 and                # 거래량 감소
+        buy_volume_ratio < 0.45               # 매수세 약화
+    ):
+        action = "sell"
+        weight = 3
+        reason.append("부분매도: 이격도과다+하락전환")
+
+    # 3. 매수 조건 체크 (매도 신호 없을 경우)
+    elif action == "hold":
+        # 3-1. 적극 매수 조건 (가중치 5)
+        if (
+            # 가격이 20이평 지지 확인
+            0.995 <= current_price/sma20_5m <= 1.005 and
+            
+            # 과매도 후 반등 시도
+            30 <= rsi_5m <= 40 and          # 과매도 벗어나는 구간
+            prev_rsi_5m < rsi_5m and        # RSI 상승 전환
+            0.2 <= percent_b <= 0.3 and     # 밴드 하단 지지
+            
+            # 매수세 유입 확인
+            volume_ratio >= 2.0 and         # 거래량 급증
+            buy_volume_ratio >= 0.65 and    # 강한 매수세
+            obv_1m > obv_1m_prev * 1.02     # OBV 2% 이상 증가
+        ):
+            action = "buy"
+            weight = 5
+            reason.append("적극매수: 이평지지+과매도반등+매수세강화")
+
+        # 3-2. 일반 매수 조건 (가중치 3)
+        elif (
+            # 20이평 지지 근처
+            0.99 <= current_price/sma20_5m <= 1.01 and
+            
+            # 적정 조정 구간
+            35 <= rsi_5m <= 45 and          # 적정 조정
+            prev_rsi_5m < rsi_5m and        # RSI 상승 전환
+            0.3 <= percent_b <= 0.4 and     # 밴드 하단 벗어남
+            
+            # 거래량 조건
+            volume_ratio >= 1.5 and         # 거래량 증가
+            buy_volume_ratio >= 0.6 and     # 매수세 우위
+            obv_1m > obv_1m_prev            # OBV 증가
+        ):
+            action = "buy"
+            weight = 3
+            reason.append("일반매수: 이평근접+적정조정+거래량증가")
+
+        # 3-3. 매수 제한 조건 체크
+        if action == "buy":
+            if (
+                trend_1m <= -2 or              # 단기 급락
+                rsi_5m < 30 or                 # 과매도 지속
+                percent_b < 0.2 or             # 밴드 하단 이탈
+                volume_ratio < 1.2 or          # 거래량 부족
+                buy_volume_ratio < 0.5 or      # 매수세 약화
+                obv_1m < obv_1m_prev * 0.98    # OBV 감소
+            ):
+                action = "hold"
+                weight = 0
+                reason = ["매수제한조건해당"]
+
+    # 4. 매도 제한 조건 체크 (매도 신호 있을 경우)
+    if action == "sell":
+        if (
+            trend_1m >= 2 and               # 단기 강한 상승
+            volume_ratio >= 2.0 and         # 거래량 급증
+            buy_volume_ratio >= 0.65 and    # 강한 매수세
+            obv_1m > obv_1m_prev * 1.02     # OBV 2% 이상 증가
+        ):
+            action = "hold"
+            weight = 0
+            reason = ["매도제한:강한상승지속"]
+
+    return action, weight, " + ".join(reason)
