@@ -34,9 +34,9 @@ class Strategy():
         df_1h = data_dict["1h"]
 
         # 2) 추세 정보 구하기
-        current_trend_1m, previous_trend_1m, bars_since_1m = utils.get_trend_info(df_1m)
-        current_trend_5m, previous_trend_5m, bars_since_5m = utils.get_trend_info(df_5m)
-        current_trend_1h, previous_trend_1h, bars_since_1h = utils.get_trend_info(df_1h)
+        current_trend_1m, previous_trend_1m, bars_since_1m, previous_trend2_1m, bars_since2_1m = utils.get_trend_info(df_1m)
+        current_trend_5m, previous_trend_5m, bars_since_5m, previous_trend2_5m, bars_since2_5m = utils.get_trend_info(df_5m)
+        current_trend_1h, previous_trend_1h, bars_since_1h, previous_trend2_1h, bars_since2_1h = utils.get_trend_info(df_1h)
 
         trend_score = current_trend_5m
 
