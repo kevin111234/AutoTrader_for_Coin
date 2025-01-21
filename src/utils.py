@@ -60,3 +60,63 @@ def get_trend_info(df):
 
 def trend1_signal():
     print(1)
+
+def trend2_signal():
+    print(2)
+
+def trend3_signal():
+    print(3)
+
+# --------------------------
+
+def trend4_signal():
+    print(4)
+
+def trend5_signal():
+    print(5)
+
+def trend6_signal():
+    print(6)
+
+# -------------------------
+
+def trend7_signal():
+    print(7)
+
+def trend8_signal():
+    print(8)
+
+def trend9_signal():
+    print(9)
+
+#-------------------------
+
+def trend_1_signal():
+    print(-1)
+
+def trend_2_signal():
+    print(-2)
+
+def trend_3_signal():
+    print(-3)
+
+# -----------------------
+
+def trend_4_signal():
+    print(-4)
+
+def trend_5_signal():
+    print(-5)
+
+def trend_6_signal():
+    print(-6)
+
+# -----------------------4
+def trend_7_signal():
+    print(-7)
+
+def trend_8_signal():
+    print(-8)
+
+def trend_9_signal():
+    print(-9)

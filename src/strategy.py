@@ -7,13 +7,7 @@ class Strategy:
     def __init__(self):
         pass
 
-    def signal(self, 
-              data_dict,
-              rsi_buy_threshold=30,
-              rsi_sell_threshold=70,
-              ratio_bullish=1.2,
-              ratio_bearish=0.8,
-              obv_lookback=10):
+    def signal(self, data_dict):
         """
         data_dict: {
             "1m": DataFrame(...),
@@ -27,44 +21,79 @@ class Strategy:
           percent_b, bandwidth, obv, ...]
         
         rsi_buy_threshold / rsi_sell_threshold : RSI 매수/매도 임계값 (과매도, 과매수)
-        ratio_bullish / ratio_bearish : 볼린저밴드 기반 등에서 사용하는 상승/하락 임계값
         obv_lookback : OBV 비교를 위해 과거 몇 봉 전의 OBV를 볼지
         """
-        # 1) 필요한 데이터 꺼내기
-        df_1m = data_dict["1m"]
-        df_5m = data_dict["5m"]
-        df_1h = data_dict["1h"]
+        def data_source(data_dict,
+                        rsi_buy_threshold=30,
+                        rsi_sell_threshold=70,
+                        volume_loockback = 5,
+                        obv_lookback=10):
+            # 1) 필요한 데이터 꺼내기
+            df_1m = data_dict["1m"]
+            df_5m = data_dict["5m"]
+            df_1h = data_dict["1h"]
 
-        # 2) 추세 정보 구하기 (확장된 get_trend_info)
-        #    --> 현재 추세, 이전 추세, 추세 변화 후 경과 봉수, 그 이전 추세 등
-        current_trend_1m, prev_trend_1m, bars_1m, prev2_trend_1m, bars2_1m = utils.get_trend_info(df_1m)
-        current_trend_5m, prev_trend_5m, bars_5m, prev2_trend_5m, bars2_5m = utils.get_trend_info(df_5m)
-        current_trend_1h, prev_trend_1h, bars_1h, prev2_trend_1h, bars2_1h = utils.get_trend_info(df_1h)
+            # 2) 추세 정보 구하기 (확장된 get_trend_info)
+            #    --> 현재 추세, 이전 추세, 추세 변화 후 경과 봉수, 그 이전 추세 등
+            current_trend_1m, t1_trend_1m, t1_1m, t2_trend_1m, t2_1m = utils.get_trend_info(df_1m)
+            current_trend_5m, t1_trend_5m, t1_5m, t2_trend_5m, t2_5m = utils.get_trend_info(df_5m)
+            current_trend_1h, t1_trend_1h, t1_1h, t2_trend_1h, t2_1h = utils.get_trend_info(df_1h)
 
-        # 여기서는 5분봉 추세를 주 추세로 쓰겠다고 가정
-        trend_score = current_trend_5m
+            # 3) 보조 지표 계산 == rsi, obv, obv_diff, 5일 거래량 평균, 매수세 비중
+            # 3-1) 1분봉
+            last_1m = df_1m.iloc[-1]
+            rsi_1m = last_1m["rsi"]
+            obv_1m = last_1m["obv"]
+            obv_past_1m = (df_1m["obv"].iloc[ -(obv_lookback + 1) : -1].mean()) / obv_lookback
+            obv_diff_1m = obv_1m - obv_past_1m
 
-        # 3) 보조 지표 계산
-        # 3-1) 1분봉
-        last_1m = df_1m.iloc[-1]
-        rsi_1m = last_1m["rsi"]
-        obv_1m = last_1m["obv"]
-        obv_past_1m = df_1m["obv"].iloc[-1 - obv_lookback]
-        obv_diff_1m = obv_1m - obv_past_1m
+            # 3-2) 5분봉
+            last_5m = df_5m.iloc[-1]
+            rsi_5m = last_5m["rsi"]
+            obv_5m = last_5m["obv"]
+            obv_past_5m = (df_5m["obv"].iloc[ -(obv_lookback + 1) : -1].mean()) / obv_lookback
+            obv_diff_5m = obv_5m - obv_past_5m
 
-        # 3-2) 5분봉
-        last_5m = df_5m.iloc[-1]
-        rsi_5m = last_5m["rsi"]
-        obv_5m = last_5m["obv"]
-        obv_past_5m = df_5m["obv"].iloc[-1 - obv_lookback]
-        obv_diff_5m = obv_5m - obv_past_5m
+            # 거래량 지표
+            avg_volume_5 = df_5m["Volume"].iloc[-(1 + volume_loockback):-1].mean()
+            volume_ratio = last_5m["Volume"] / avg_volume_5
+            buy_volume_ratio = 0
+            if last_5m["Volume"] != 0:
+                buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"]
+            
+            return {
+              "current_trend_1m":current_trend_1m, # 1분봉 현재 추세
+              "t1_trend_1m":t1_trend_1m,           # 1분봉 직전 추세
+              "t1_1m":t1_1m,                       # 1분봉 현재 추세 지속시간
+              "t2_trend_1m":t2_trend_1m,           # 1분봉 직전의 직전 추세
+              "t2_1m":t2_1m,                       # 1분봉 직전 추세 지속시간
 
-        # 거래량 지표
-        avg_volume_5 = df_5m["Volume"].iloc[-6:-1].mean() if len(df_5m) >= 6 else 0
-        volume_ratio = last_5m["Volume"] / avg_volume_5
-        buy_volume_ratio = 0
-        if last_5m["Volume"] != 0:
-            buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"]
+              "current_trend_5m":current_trend_5m, # 5분봉 현재 추세
+              "t1_trend_5m":t1_trend_5m,           # 5분봉 직전 추세
+              "t1_5m":t1_5m,                       # 5분봉 현재 추세 지속시간
+              "t2_trend_5m":t2_trend_5m,           # 5분봉 직전의 직전 추세
+              "t2_5m":t2_5m,                       # 5분봉 직전 추세 지속시간
+
+              "current_trend_1h":current_trend_1h, # 1시간봉 현재 추세 
+              "t1_trend_1h":t1_trend_1h,           # 1시간봉 직전 추세
+              "t1_1h":t1_1h,                       # 1시간봉 현재 추세 지속시간
+              "t2_trend_1h":t2_trend_1h,           # 1시간봉 직전의 직전 추세
+              "t2_1h":t2_1h,                       # 1시간봉 직전 추세 지속시간
+
+              "rsi_1m":rsi_1m,                     # 1분봉 rsi
+              "obv_1m":obv_1m,                     # 1분봉 obv
+              "obv_diff_1m":obv_diff_1m,           # 1분봉 obv와 이전 10개 봉 obv 평균의 편차 (obv의 기울기를 간단하게 나타냄.)
+
+              "rsi_5m":rsi_5m,                     # 5분봉 rsi
+              "obv_5m":obv_5m,                     # 5분봉 obv
+              "obv_diff_5m":obv_diff_5m,           # 5분봉 obv와 이전 10개 봉 obv 평균의 편차 (obv의 기울기를 간단하게 나타냄.)
+              
+              "volume_ratio":volume_ratio,         # 거래량이 최근 평균보다 높으면 1보다 크고, 낮으면 1보다 작음
+              "buy_volume_ratio":buy_volume_ratio, # 총 거래량 중 시장가 매수 비율
+            }
+        
+        data_core = data_source(data_dict)
+        trend_score = data_core["current_trend_5m"]
 
         # 4) 기본 시그널 초기화
         signal = "hold"
@@ -74,11 +103,52 @@ class Strategy:
         # 5) 추세 코드별 시그널 분기
         # SMA20 > 60 > 120
         if trend_score == 1:
-            print(1)
+            signal, weight, reason = utils.trend1_signal()
         elif trend_score == 2:
-            print(2)
+            signal, weight, reason = utils.trend2_signal()
         elif trend_score == 3:
-            print(3)
+            signal, weight, reason = utils.trend3_signal()
+
+        # SMA60 < 120 < 20
+        elif trend_score == 4:
+            signal, weight, reason = utils.trend4_signal()
+        elif trend_score == 5:
+            signal, weight, reason = utils.trend5_signal()
+        elif trend_score == 6:
+            signal, weight, reason = utils.trend6_signal()
+
+        # SMa120 < 20 < 60
+        elif trend_score == 7:
+            signal, weight, reason = utils.trend7_signal()
+        elif trend_score == 8:
+            signal, weight, reason = utils.trend8_signal()
+        elif trend_score == 9:
+            signal, weight, reason = utils.trend9_signal()
+
+        # SMA20 < 120 < 60
+        elif trend_score == -1:
+            signal, weight, reason =utils.trend_1_signal()
+        elif trend_score == -2:
+            signal, weight, reason =utils.trend_2_signal()
+        elif trend_score == -3:
+            signal, weight, reason =utils.trend_3_signal()
+
+        # SMA60 < 20 < 120
+        elif trend_score == -4:
+            signal, weight, reason =utils.trend_4_signal()
+        elif trend_score == -5:
+            signal, weight, reason =utils.trend_5_signal()
+        elif trend_score == -6:
+            signal, weight, reason =utils.trend_6_signal()
+
+        # SMA20 < 60 < 120
+        elif trend_score == -7:
+            signal, weight, reason =utils.trend_7_signal()
+        elif trend_score == -8:
+            signal, weight, reason =utils.trend_8_signal()
+        elif trend_score == -9:
+            signal, weight, reason =utils.trend_9_signal()
+
 
         else:
             # 기본 hold
@@ -91,12 +161,8 @@ class Strategy:
             "signal": signal,
             "weight": weight,
             "reason": reason,
-            "trend_5m": current_trend_5m,
-            "previous_trend_5m": prev_trend_5m,
-            "bars_since_5m": bars_5m,
-            "trend_1h": current_trend_1h,
-            "previous_trend_1h": prev_trend_1h,
-            "bars_since_1h": bars_1h,
+            "trend_5m": data_core["current_trend_5m"],
+            "trend_1h": data_core["current_trend_1h"],
         }
 
 class Position_Tracker:
