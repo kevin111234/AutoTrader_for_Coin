@@ -4,6 +4,7 @@ import time
 from config import Config
 from data_control import Data_Control
 from notifier import Notifier
+from strategy import Strategy
 
 def main():
     print("투자 프로그램을 시작합니다.")
@@ -17,6 +18,7 @@ def main():
     client = Client(config.binance_access_key, config.binance_secret_key)
     data_control = Data_Control()
     notifier = Notifier()
+    strategy = Strategy()
 
     # 서버 시간과 로컬 시간 동기화
     local_time = int(time.time() * 1000)
@@ -144,6 +146,8 @@ def main():
 
                 # -------------------------------------------------------------------------
                 # 매수/매도 판단
+                signal = {}
+                signal = strategy.signal(initial_data[ticker])
 
                 # 주문 진행
             
@@ -170,11 +174,11 @@ def main():
 
                         # -------------------------------------------------------------------------
                         # 매수/매도 판단
+                        signal = {}
+                        signal = strategy.signal(futures_data[ticker])
 
                         # 주문 진행
 
-            print(initial_data)
-            print(futures_data)
             time.sleep(10)
         except Exception as e:
             print(f"메인 루프 오류: {e}")

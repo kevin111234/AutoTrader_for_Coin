@@ -59,9 +59,9 @@ class Strategy:
         obv_past_5m = df_5m["obv"].iloc[-1 - obv_lookback]
         obv_diff_5m = obv_5m - obv_past_5m
 
-        # 거래량 지표 예시
+        # 거래량 지표
         avg_volume_5 = df_5m["Volume"].iloc[-6:-1].mean() if len(df_5m) >= 6 else 0
-        volume_ratio = last_5m["Volume"] / avg_volume_5 if avg_volume_5 != 0 else 0
+        volume_ratio = last_5m["Volume"] / avg_volume_5
         buy_volume_ratio = 0
         if last_5m["Volume"] != 0:
             buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"]
