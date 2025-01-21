@@ -3,17 +3,17 @@ from config import Config
 import numpy as np
 
 import utils
-class Strategy():
+class Strategy:
     def __init__(self):
-      pass
+        pass
 
     def signal(self, 
-                data_dict,
-                rsi_buy_threshold=30,
-                rsi_sell_threshold=70,
-                ratio_bullish=1.2,
-                ratio_bearish=0.8,
-                obv_lookback=10):
+              data_dict,
+              rsi_buy_threshold=30,
+              rsi_sell_threshold=70,
+              ratio_bullish=1.2,
+              ratio_bearish=0.8,
+              obv_lookback=10):
         """
         data_dict: {
             "1m": DataFrame(...),
@@ -21,105 +21,107 @@ class Strategy():
             "1h": DataFrame(...)
             # 필요하면 다른 타임프레임도 추가
         }
-        각 DataFrame은 다음 컬럼을 포함한다고 가정:
+        각 DataFrame에는 다음과 같은 컬럼이 있다고 가정:
         [Open Time, Open, High, Low, Close, Volume, Taker Buy Base Asset Volume, Taker Sell Base Asset Volume,
-          SMA_20, SMA_60, SMA_120, rsi, rsi_signal, middle_boll, upper_boll, lower_boll, persent_b, bandwidth, obv]
-        """
-
+          SMA_20, SMA_60, SMA_120, rsi, rsi_signal, middle_boll, upper_boll, lower_boll,
+          percent_b, bandwidth, obv, ...]
         
-
+        rsi_buy_threshold / rsi_sell_threshold : RSI 매수/매도 임계값 (과매도, 과매수)
+        ratio_bullish / ratio_bearish : 볼린저밴드 기반 등에서 사용하는 상승/하락 임계값
+        obv_lookback : OBV 비교를 위해 과거 몇 봉 전의 OBV를 볼지
+        """
         # 1) 필요한 데이터 꺼내기
         df_1m = data_dict["1m"]
         df_5m = data_dict["5m"]
         df_1h = data_dict["1h"]
 
-        # 2) 추세 정보 구하기
-        current_trend_1m, previous_trend_1m, bars_since_1m, previous_trend2_1m, bars_since2_1m = utils.get_trend_info(df_1m)
-        current_trend_5m, previous_trend_5m, bars_since_5m, previous_trend2_5m, bars_since2_5m = utils.get_trend_info(df_5m)
-        current_trend_1h, previous_trend_1h, bars_since_1h, previous_trend2_1h, bars_since2_1h = utils.get_trend_info(df_1h)
+        # 2) 추세 정보 구하기 (확장된 get_trend_info)
+        #    --> 현재 추세, 이전 추세, 추세 변화 후 경과 봉수, 그 이전 추세 등
+        current_trend_1m, prev_trend_1m, bars_1m, prev2_trend_1m, bars2_1m = utils.get_trend_info(df_1m)
+        current_trend_5m, prev_trend_5m, bars_5m, prev2_trend_5m, bars2_5m = utils.get_trend_info(df_5m)
+        current_trend_1h, prev_trend_1h, bars_1h, prev2_trend_1h, bars2_1h = utils.get_trend_info(df_1h)
 
+        # 여기서는 5분봉 추세를 주 추세로 쓰겠다고 가정
         trend_score = current_trend_5m
 
-        # 3-1) 보조 지표(1분봉 RSI, OBV 등)
+        # 3) 보조 지표 계산
+        # 3-1) 1분봉
         last_1m = df_1m.iloc[-1]
         rsi_1m = last_1m["rsi"]
         obv_1m = last_1m["obv"]
         obv_past_1m = df_1m["obv"].iloc[-1 - obv_lookback]
         obv_diff_1m = obv_1m - obv_past_1m
 
-        # 3-2) 보조 지표(5분봉 RSI, OBV 등)
+        # 3-2) 5분봉
         last_5m = df_5m.iloc[-1]
         rsi_5m = last_5m["rsi"]
         obv_5m = last_5m["obv"]
         obv_past_5m = df_5m["obv"].iloc[-1 - obv_lookback]
         obv_diff_5m = obv_5m - obv_past_5m
 
-        # volume_ratio 계산 (현재 거래량 / 이전 5봉 평균)
-        avg_volume_5 = df_5m["Volume"].iloc[-6:-1].mean()  # 이전 5봉 평균
+        # 거래량 지표 예시
+        avg_volume_5 = df_5m["Volume"].iloc[-6:-1].mean() if len(df_5m) >= 6 else 0
         volume_ratio = last_5m["Volume"] / avg_volume_5 if avg_volume_5 != 0 else 0
+        buy_volume_ratio = 0
+        if last_5m["Volume"] != 0:
+            buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"]
 
-        # buy_volume_ratio 계산 (매수 거래량 비율)
-        buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"] if last_5m["Volume"] != 0 else 0
-
-        # 4) 기본 시그널과 가중치
+        # 4) 기본 시그널 초기화
         signal = "hold"
         weight = 0
+        reason = ""
 
+        # 5) 추세 코드별 시그널 분기
         if trend_score == 1:
-            # trend1_signal 호출 수정
+            # 5분봉에서 급격한 상승(RBW>1.1) 상태
+            # -> utils.trend1_signal() 함수를 호출하여 상세 로직 처리
             signal, weight, reason = utils.trend1_signal(
-                trend_1m=current_trend_1m,
-                current_price=last_5m["Close"],
-                sma20_5m=last_5m["SMA_20"],
+                trend_1m=current_trend_1m,          # 상위 타임프레임 or 1분봉 추세 참고
+                trend_1h=current_trend_1h,          # 1시간봉 추세도 참고하여 상위 관점 체크
+                current_price=last_5m["Close"],      # 현재 5분봉 종가
+                sma20_5m=last_5m["SMA_20"],         # 단기 이동평균
                 rsi_1m=rsi_1m,
                 prev_rsi_1m=df_1m["rsi"].iloc[-2],  # 이전 1분봉 RSI
                 obv_1m=obv_1m,
                 obv_1m_prev=df_1m["obv"].iloc[-2],  # 이전 1분봉 OBV
                 rsi_5m=rsi_5m,
                 prev_rsi_5m=df_5m["rsi"].iloc[-2],  # 이전 5분봉 RSI
-                percent_b=last_5m["percent_b"],
-                volume_ratio=volume_ratio,           # 계산 필요
-                buy_volume_ratio=buy_volume_ratio    # 계산 필요
-            )
-        elif trend_score == 2:
-            # trend2_signal 호출 수정
-            signal, weight, reason = utils.trend2_signal(
-                trend_1m=current_trend_1m,
-                current_price=last_5m["Close"],
-                sma20_5m=last_5m["SMA_20"],
-                rsi_1m=rsi_1m,
-                prev_rsi_1m=df_1m["rsi"].iloc[-2],
-                obv_1m=obv_1m,
-                obv_1m_prev=df_1m["obv"].iloc[-2],
-                rsi_5m=rsi_5m,
-                prev_rsi_5m=df_5m["rsi"].iloc[-2],
-                percent_b=last_5m["percent_b"],
-                volume_ratio=volume_ratio,
-                buy_volume_ratio=buy_volume_ratio
-            )
-        elif trend_score == 3:
-            # trend3_signal 호출 추가
-            signal, weight, reason = utils.trend3_signal(
-                trend_1m=current_trend_1m,
-                current_price=last_5m["Close"],
-                sma20_5m=last_5m["SMA_20"],
-                rsi_5m=rsi_5m,
-                prev_rsi_5m=df_5m["rsi"].iloc[-2],
-                percent_b=last_5m["percent_b"],
+                percent_b=last_5m.get("percent_b", 0),  # 혹은 last_5m["percent_b"] (컬럼명에 맞춰 수정)
                 volume_ratio=volume_ratio,
                 buy_volume_ratio=buy_volume_ratio,
-                obv_1m=obv_1m,
-                obv_1m_prev=df_1m["obv"].iloc[-2]
+                bars_since_5m=bars_5m,
+                bars_since_1h=bars_1h,
+                # 필요한 인자들을 추가로 넘길 수 있음
             )
 
+        elif trend_score == 2:
+            # 2번 추세(안정적 상승) 시 utils.trend2_signal() 호출 등
+            # signal, weight, reason = utils.trend2_signal(...)
+            pass
 
+        elif trend_score == 3:
+            # 3번 추세(상승 추세 내 조정 가능성) 시 utils.trend3_signal() 호출
+            pass
+
+        # ... 나머지 추세 코드는 유사 로직 ...
+
+        else:
+            # 그 외 (0, 10~16, 음수, etc.) 기본 hold
+            signal = "hold"
+            weight = 0
+            reason = f"No specific strategy for trend_score={trend_score}"
+
+        # 6) 결과 반환
         return {
             "signal": signal,
             "weight": weight,
             "reason": reason,
-            "current_trend_1m": current_trend_1m,
-            "current_trend_5m": current_trend_5m,
-            "current_trend_1h": current_trend_1h,
+            "trend_5m": current_trend_5m,
+            "previous_trend_5m": prev_trend_5m,
+            "bars_since_5m": bars_5m,
+            "trend_1h": current_trend_1h,
+            "previous_trend_1h": prev_trend_1h,
+            "bars_since_1h": bars_1h,
         }
 
 class Position_Tracker:

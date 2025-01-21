@@ -58,130 +58,118 @@ def get_trend_info(df):
         bars_since_t_minus_1,  # T-1 추세가 몇 봉 유지되었는지
     )
 
+def trend1_signal(trend_1m,
+                  trend_1h,
+                  current_price,
+                  sma20_5m,
+                  rsi_1m,
+                  prev_rsi_1m,
+                  obv_1m,
+                  obv_1m_prev,
+                  rsi_5m,
+                  prev_rsi_5m,
+                  percent_b,
+                  volume_ratio,
+                  buy_volume_ratio,
+                  bars_since_5m,
+                  bars_since_1h):
+    """
+    5분봉 코드=1 (급격 상승, RBW>1.1)에서의 매수/매도 시그널 예시.
 
-def trend1_signal(
-    # 추세 정보
-    trend_1m,         # 1분봉 추세
-    trend_1h,         # 1시간봉 추세 (참고용)
-    
-    # 가격 정보
-    current_price,    # 현재가
-    sma20_5m,        # 5분봉 20이평
-    
-    # 1분봉 지표
-    rsi_1m,          # 1분봉 RSI
-    obv_1m,          # 1분봉 현재 OBV
-    obv_1m_prev,     # 1분봉 이전 OBV
-    
-    # 5분봉 지표
-    rsi_5m,          # 5분봉 RSI
-    percent_b,       # 5분봉 %B
-    volume_ratio,    # 거래량 비율 (현재/이전5봉평균)
-    buy_volume_ratio # 매수 거래량 비율
-):
+    매개변수:
+      - trend_1m: 1분봉 추세 코드 (참고용)
+      - trend_1h: 1시간봉 추세 코드 (상위 추세 판단)
+      - current_price: 현재 5분봉 종가
+      - sma20_5m: 5분봉 SMA_20 (참고)
+      - rsi_1m, prev_rsi_1m: 1분봉 RSI(현재/직전)
+      - obv_1m, obv_1m_prev: 1분봉 OBV(현재/직전)
+      - rsi_5m, prev_rsi_5m: 5분봉 RSI(현재/직전)
+      - percent_b: 볼린저 %b (0~1 범위, 1 이상이면 상단 돌파)
+      - volume_ratio: 현재 5분봉 거래량 / 이전 5봉 평균 거래량
+      - buy_volume_ratio: 5분봉 매수 거래량 비율 (taker buy / total volume)
+      - bars_since_5m: 5분봉 추세가 코드1로 전환된 뒤 경과 봉 수
+      - bars_since_1h: 1시간봉 추세 전환 후 경과 봉 수 (참고)
+
+    반환:
+      signal: "buy", "sell", "hold" 중 하나
+      weight: 1~5 (포지션 비중)
+      reason: 간단한 설명
     """
-    추세 1번 상태(급격한 상승 + 높은 변동성)의 매매 시그널
-    """
-    action = "hold"
+
+    signal = "hold"
     weight = 0
-    reason = []
+    reason = ""
 
-    # 1. 전량 매도 조건 (가중치 5) 체크
-    if trend_1m <= -2:
-        action = "sell"
-        weight = 5
-        reason.append("1분봉 추세 급락")
-    
-    elif (rsi_5m >= 75 and rsi_1m >= 80 and 
-          percent_b >= 0.95 and 
-          obv_1m < obv_1m_prev * 0.95 and
-          (1 - buy_volume_ratio) >= 0.65):  # sell_volume_ratio
-        action = "sell"
-        weight = 5
-        reason.append("과매수+매도세 강화")
-    
-    elif (current_price < sma20_5m and volume_ratio > 2):
-        action = "sell"
-        weight = 5
-        reason.append("SMA20 하향돌파+거래량급증")
-
-    # 2. 부분 매도 조건 (가중치 3) 체크
-    elif trend_1m <= 0:
-        if rsi_1m >= 75 and rsi_5m >= 70:
-            action = "sell"
-            weight = 3
-            reason.append("상승세둔화+과매수진입")
-    
-    elif (percent_b >= 0.85 and
-          current_price > sma20_5m * 1.02 and
-          volume_ratio < 0.7):
-        action = "sell"
+    # --------------------------------------------------------------------------------
+    # 1) 우선 과매수 / 급등락 확인 → 매도 조건(익절 or 위험 회피) 우선 체크 예시
+    # --------------------------------------------------------------------------------
+    if rsi_5m >= 80:
+        signal = "sell"
+        weight = 5  # 부분 익절 (강제)
+        reason = "5분봉 RSI>=80 과매수 구간 - 부분 청산"
+        return signal, weight, reason
+    elif obv_1m < obv_1m_prev * 0.95:
+        # OBV가 직전 대비 5% 이상 급감 -> 매수세 이탈 신호
+        signal = "sell"
         weight = 3
-        reason.append("과매수경계+거래량감소")
+        reason = "1분봉 OBV 급감 - 단기 매수세 이탈"
+        return signal, weight, reason
 
-    # 3. 소규모 매도 조건 (가중치 2) 체크
-    elif (rsi_5m >= 65 and rsi_1m >= 70 and
-          percent_b >= 0.8):
-        action = "sell"
-        weight = 2
-        reason.append("초기과매수")
-    
-    elif (volume_ratio < 0.8 and
-          buy_volume_ratio < 0.5):
-        action = "sell"
-        weight = 2
-        reason.append("매수세약화")
+    # --------------------------------------------------------------------------------
+    # 2) 매수 접근 로직
+    #    (A) 상위 타임프레임(1시간봉) 추세가 양수/중립일 때 vs 음수일 때
+    #    (B) bars_since_5m (막 전환 초입 여부)
+    #    (C) 1분봉 RSI/OBV 등 추가 확인
+    # --------------------------------------------------------------------------------
 
-    # 4. 매수 조건 체크 (매도 시그널 없을 경우에만)
-    elif action == "hold":
-        # 4-1. 안전 매수 조건 (가중치 5)
-        if (10 > trend_1h >= 2 and  # 상위 추세 강함
-            abs(current_price/sma20_5m - 1) <= 0.01 and  # SMA20 1% 이내
-            35 <= rsi_5m <= 45 and
-            0.3 <= percent_b <= 0.5 and
-            obv_1m > obv_1m_prev and
-            volume_ratio >= 1.5 and
-            buy_volume_ratio >= 0.6):
-            action = "buy"
-            weight = 5
-            reason.append("안전매수조건충족")
+    # (A) 1시간봉 추세에 따라 기본 베이스 가중치 설정
+    if trend_1h >= 0:
+        # 상위도 상승/중립 => 공격적 접근 가능
+        base_weight = 3
+        base_reason = "1시간봉 상승/중립"
+    else:
+        # 상위가 하락 => 단기 반등 가능성은 있으나 보수적 접근
+        base_weight = 1
+        base_reason = "1시간봉 하락, 단기 반등 가정"
 
-        # 4-2. 일반 매수 조건 (가중치 3)
-        elif (10 > trend_1h > 0 and  # 상위 추세 긍정
-              abs(current_price/sma20_5m - 1) <= 0.015 and  # SMA20 1.5% 이내
-              40 <= rsi_5m <= 50 and
-              0.4 <= percent_b <= 0.6 and
-              obv_1m > obv_1m_prev and
-              volume_ratio >= 1.2):
-            action = "buy"
-            weight = 3
-            reason.append("일반매수조건충족")
+    # (B) 5분봉 추세 막 전환 여부
+    if bars_since_5m <= 2:
+        # 막 전환이면 추세 초입으로 볼 수 있음 => 가중치 플러스
+        base_weight += 1
+        base_reason += " + 5분봉 추세 전환 초입"
 
-        # 4-3. 매수 제한 조건 체크
-        if action == "buy":
-            if (rsi_5m >= 60 or rsi_1m >= 70 or
-                percent_b >= 0.8 or
-                current_price > sma20_5m * 1.015):
-                action = "hold"
-                weight = 0
-                reason = ["매수제한조건해당"]
+    # (C) 1분봉 RSI/OBV 확인 (추가 플러스/마이너스)
+    if rsi_1m < 70 and obv_1m > obv_1m_prev:
+        # 과매수 아님 + OBV 상승 => 매수 가중치 추가
+        base_weight += 1
+        base_reason += " + 1분봉 RSI<70 & OBV 상승"
+    else:
+        # rsi_1m>=70이면 이미 단기 과열이거나 OBV가 줄어든 상태 => 가중치 억제
+        base_reason += " (1분봉 과열 or OBV 약화)"
 
-    # 5. 매도 제한 조건 체크 (매도 시그널 있을 경우)
-    if action == "sell":
-        if (trend_1m >= 2 and
-            volume_ratio > 2 and
-            buy_volume_ratio > 0.7):
-            action = "hold"
-            weight = 0
-            reason = ["매도제한:강한상승지속"]
-        
-        elif (current_price >= sma20_5m and
-              rsi_5m < 65):
-            action = "hold"
-            weight = 0
-            reason = ["매도제한:지지선안정"]
+    # volume_ratio나 buy_volume_ratio를 활용해서 매수세가 특별히 강한지 추가 판단 가능
+    if volume_ratio > 2 and buy_volume_ratio > 0.6:
+        # 거래량 폭발 + 매수 비중 높음 => 추세 신뢰도 상승
+        base_weight += 1
+        base_reason += f" + 거래량폭발({volume_ratio:.2f}), 매수비율({buy_volume_ratio:.2f})"
 
-    return action, weight, " + ".join(reason)
+    # --------------------------------------------------------------------------------
+    # 3) 최종 매수 시그널 결정
+    # --------------------------------------------------------------------------------
+    # 과도하게 커지지 않도록 클램프
+    final_weight = min(max(base_weight, 0), 5)
+
+    if final_weight <= 0:
+        signal = "hold"
+        weight = 0
+        reason = "매수 근거 미약 or 음수"
+    else:
+        signal = "buy"
+        weight = final_weight
+        reason = f"{base_reason}, weight={final_weight}"
+
+    return signal, weight, reason
+
 
 def trend2_signal(
     # 추세 정보
