@@ -58,65 +58,65 @@ def get_trend_info(df):
         bars_since_t_minus_1,  # T-1 추세가 몇 봉 유지되었는지
     )
 
-def trend1_signal():
+def trend1_signal(data_core):
     print(1)
 
-def trend2_signal():
+def trend2_signal(data_core):
     print(2)
 
-def trend3_signal():
+def trend3_signal(data_core):
     print(3)
 
 # --------------------------
 
-def trend4_signal():
+def trend4_signal(data_core):
     print(4)
 
-def trend5_signal():
+def trend5_signal(data_core):
     print(5)
 
-def trend6_signal():
+def trend6_signal(data_core):
     print(6)
 
 # -------------------------
 
-def trend7_signal():
+def trend7_signal(data_core):
     print(7)
 
-def trend8_signal():
+def trend8_signal(data_core):
     print(8)
 
-def trend9_signal():
+def trend9_signal(data_core):
     print(9)
 
 #-------------------------
 
-def trend_1_signal():
+def trend_1_signal(data_core):
     print(-1)
 
-def trend_2_signal():
+def trend_2_signal(data_core):
     print(-2)
 
-def trend_3_signal():
+def trend_3_signal(data_core):
     print(-3)
 
 # -----------------------
 
-def trend_4_signal():
+def trend_4_signal(data_core):
     print(-4)
 
-def trend_5_signal():
+def trend_5_signal(data_core):
     print(-5)
 
-def trend_6_signal():
+def trend_6_signal(data_core):
     print(-6)
 
 # -----------------------4
-def trend_7_signal():
+def trend_7_signal(data_core):
     print(-7)
 
-def trend_8_signal():
+def trend_8_signal(data_core):
     print(-8)
 
-def trend_9_signal():
+def trend_9_signal(data_core):
     print(-9)

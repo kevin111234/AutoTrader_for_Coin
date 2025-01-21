@@ -146,6 +146,7 @@ def main():
 
                 # -------------------------------------------------------------------------
                 # 매수/매도 판단
+                print(initial_data)
                 signal = {}
                 signal = strategy.signal(initial_data[ticker])
 
@@ -172,10 +173,11 @@ def main():
                         futures_vp_data[ticker][timeframe] = profile_df
                         futures_tpo_data[ticker][timeframe] = sr_levels
 
-                        # -------------------------------------------------------------------------
-                        # 매수/매도 판단
-                        signal = {}
-                        signal = strategy.signal(futures_data[ticker])
+                    # -------------------------------------------------------------------------
+                    # 매수/매도 판단
+                    print(futures_data)
+                    signal = {}
+                    signal = strategy.signal(futures_data[ticker])
 
                         # 주문 진행
 
