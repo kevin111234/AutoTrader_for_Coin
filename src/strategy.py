@@ -72,41 +72,16 @@ class Strategy:
         reason = ""
 
         # 5) 추세 코드별 시그널 분기
+        # SMA20 > 60 > 120
         if trend_score == 1:
-            # 5분봉에서 급격한 상승(RBW>1.1) 상태
-            # -> utils.trend1_signal() 함수를 호출하여 상세 로직 처리
-            signal, weight, reason = utils.trend1_signal(
-                trend_1m=current_trend_1m,          # 상위 타임프레임 or 1분봉 추세 참고
-                trend_1h=current_trend_1h,          # 1시간봉 추세도 참고하여 상위 관점 체크
-                current_price=last_5m["Close"],      # 현재 5분봉 종가
-                sma20_5m=last_5m["SMA_20"],         # 단기 이동평균
-                rsi_1m=rsi_1m,
-                prev_rsi_1m=df_1m["rsi"].iloc[-2],  # 이전 1분봉 RSI
-                obv_1m=obv_1m,
-                obv_1m_prev=df_1m["obv"].iloc[-2],  # 이전 1분봉 OBV
-                rsi_5m=rsi_5m,
-                prev_rsi_5m=df_5m["rsi"].iloc[-2],  # 이전 5분봉 RSI
-                percent_b=last_5m.get("percent_b", 0),  # 혹은 last_5m["percent_b"] (컬럼명에 맞춰 수정)
-                volume_ratio=volume_ratio,
-                buy_volume_ratio=buy_volume_ratio,
-                bars_since_5m=bars_5m,
-                bars_since_1h=bars_1h,
-                # 필요한 인자들을 추가로 넘길 수 있음
-            )
-
+            print(1)
         elif trend_score == 2:
-            # 2번 추세(안정적 상승) 시 utils.trend2_signal() 호출 등
-            # signal, weight, reason = utils.trend2_signal(...)
-            pass
-
+            print(2)
         elif trend_score == 3:
-            # 3번 추세(상승 추세 내 조정 가능성) 시 utils.trend3_signal() 호출
-            pass
-
-        # ... 나머지 추세 코드는 유사 로직 ...
+            print(3)
 
         else:
-            # 그 외 (0, 10~16, 음수, etc.) 기본 hold
+            # 기본 hold
             signal = "hold"
             weight = 0
             reason = f"No specific strategy for trend_score={trend_score}"
