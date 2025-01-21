@@ -258,48 +258,143 @@ class Data_Control():
 
         return profile_df, sr_levels
 
-    def cal_obv(self, df, price_col='Close', volume_col='Volume'):
+    def cal_obv(self, df, price_col='Close', volume_col='Volume',
+                obv_col='obv', p=5):
         """
-        OBV(On-Balance Volume) 계산
-        - 이미 계산된 구간은 건너뛰고, NaN인 곳만 업데이트
-        - OBV[i] = OBV[i-1] + volume  (종가 상승 시)
-                = OBV[i-1] - volume  (종가 하락 시)
-                = OBV[i-1]           (종가 동일 시)
+        1) OBV(On-Balance Volume) 계산
+          - 이미 계산된 구간( NaN이 아닌 부분 )은 건너뛰고, NaN인 곳만 업데이트
+          - OBV[i] = OBV[i-1] ± volume  (종가 상승/하락 시)
+        2) 최근 p개 봉(또는 일)에 대한 OBV 고점/저점 계산
+          - obv_max_p, obv_min_p
+        3) (고점 - 현재값) 기울기, (저점 - 현재값) 기울기
+          - 예: obv_slope_from_max = ( current_obv - max_obv_in_p ) / p
+          - 예: obv_slope_from_min = ( current_obv - min_obv_in_p ) / p
+            (혹은 max - current 로 할지, current - max 로 할지는 자유)
+        4) 반환: df ( obv, obv_slope_from_max, obv_slope_from_min 컬럼 포함 )
         """
 
-        # 1) obv 컬럼 없으면 만들어 둠
-        if 'obv' not in df.columns:
-            df['obv'] = np.nan
+        # ---------------------------
+        # 0) 컬럼 준비
+        # ---------------------------
+        # obv가 없으면 생성
+        if obv_col not in df.columns:
+            df[obv_col] = np.nan
 
-        # 2) 마지막으로 유효한 인덱스 찾기
-        last_valid = df['obv'].last_valid_index()
+        # 고점/저점 & 기울기 컬럼들
+        obv_max_col = f'{obv_col}_max_{p}'
+        obv_min_col = f'{obv_col}_min_{p}'
+        slope_from_max_col = f'{obv_col}_slope_from_max'
+        slope_from_min_col = f'{obv_col}_slope_from_min'
+
+        for col in [obv_max_col, obv_min_col, slope_from_max_col, slope_from_min_col]:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        # ---------------------------
+        # 1) OBV 계산
+        # ---------------------------
+        last_valid = df[obv_col].last_valid_index()
         if last_valid is None:
             last_valid = -1  # 전부 NaN이면 -1로 설정
 
-        # 3) last_valid + 1부터 끝까지 계산
         for i in range(last_valid + 1, len(df)):
-            # 맨 첫 행이면 초기값 설정 (볼륨 그대로 넣거나 0으로 시작 등 원하는 로직)
             if i == 0:
-                df.loc[i, 'obv'] = df.loc[i, volume_col]
+                # 맨 처음 값은 편의상 거래량 그대로 or 0 으로 시작
+                df.loc[i, obv_col] = df.loc[i, volume_col]
                 continue
-            
+
             # 이미 값이 있으면 스킵
-            if not pd.isna(df.loc[i, 'obv']):
+            if not pd.isna(df.loc[i, obv_col]):
                 continue
-            
+
             prev_price = df.loc[i - 1, price_col]
             curr_price = df.loc[i, price_col]
-            prev_obv = df.loc[i - 1, 'obv'] if not pd.isna(df.loc[i - 1, 'obv']) else 0
+            prev_obv = df.loc[i - 1, obv_col]
+            if pd.isna(prev_obv):
+                prev_obv = 0
+
             curr_vol = df.loc[i, volume_col]
 
             if curr_price > prev_price:
-                df.loc[i, 'obv'] = prev_obv + curr_vol
+                df.loc[i, obv_col] = prev_obv + curr_vol
             elif curr_price < prev_price:
-                df.loc[i, 'obv'] = prev_obv - curr_vol
+                df.loc[i, obv_col] = prev_obv - curr_vol
             else:
-                # 가격이 동일하다면 변화 없음
-                df.loc[i, 'obv'] = prev_obv
+                df.loc[i, obv_col] = prev_obv
 
+        # ---------------------------
+        # 2) p개 구간의 OBV 고점/저점 계산
+        # ---------------------------
+        # 고점/저점 컬럼의 last_valid
+        last_valid_max = df[obv_max_col].last_valid_index()
+        last_valid_min = df[obv_min_col].last_valid_index()
+        candidate_idx = []
+        if last_valid_max is not None:
+            candidate_idx.append(last_valid_max)
+        if last_valid_min is not None:
+            candidate_idx.append(last_valid_min)
+
+        if len(candidate_idx) > 0:
+            last_valid_highlow = min(candidate_idx)
+        else:
+            last_valid_highlow = -1
+
+        for i in range(last_valid_highlow + 1, len(df)):
+            current_obv_val = df.loc[i, obv_col]
+            if pd.isna(current_obv_val):
+                continue  # OBV가 NaN이면 건너뜀
+
+            # p봉 전부터 i까지 구간
+            if i < p - 1:
+                # p-1 개 이전 인덱스가 유효하지 않으면 패스
+                continue
+
+            # 이미 값 있으면 스킵
+            if (not pd.isna(df.loc[i, obv_max_col])) and (not pd.isna(df.loc[i, obv_min_col])):
+                continue
+
+            start_idx = i - (p - 1)
+            obv_subset = df.loc[start_idx:i, obv_col]
+
+            df.loc[i, obv_max_col] = obv_subset.max()
+            df.loc[i, obv_min_col] = obv_subset.min()
+
+        # ---------------------------
+        # 3) (고점 - 현재값), (저점 - 현재값) 기울기 계산
+        # ---------------------------
+        # 여기서는 (현재 - 고점)/p, (현재 - 저점)/p 로 정의함
+        # 질문 내용이 "고점 - 현재값 기울기"였지만, 부호 방향을 어떻게 할지는 자유
+        # 원하는 대로 수정해서 쓰세요 :)
+        last_valid_slope_max = df[slope_from_max_col].last_valid_index()
+        last_valid_slope_min = df[slope_from_min_col].last_valid_index()
+        candidate_idx_2 = []
+        if last_valid_slope_max is not None:
+            candidate_idx_2.append(last_valid_slope_max)
+        if last_valid_slope_min is not None:
+            candidate_idx_2.append(last_valid_slope_min)
+
+        if len(candidate_idx_2) > 0:
+            last_valid_slope = min(candidate_idx_2)
+        else:
+            last_valid_slope = -1
+
+        for i in range(last_valid_slope + 1, len(df)):
+            current_obv_val = df.loc[i, obv_col]
+            max_val = df.loc[i, obv_max_col]
+            min_val = df.loc[i, obv_min_col]
+
+            if pd.isna(current_obv_val) or pd.isna(max_val) or pd.isna(min_val):
+                continue
+
+            # (현재 OBV - 고점) / p
+            # 질문에서 "고점 - 현재값 기울기"라고 했으니 부호 반대로 할 수도 있음
+            df.loc[i, slope_from_max_col] = (current_obv_val - max_val) / p
+            df.loc[i, slope_from_min_col] = (current_obv_val - min_val) / p
+
+        # ---------------------------
+        # 4) 반환
+        # ---------------------------
+        # 최종적으로 obv, obv_slope_from_max, obv_slope_from_min 등을 포함한 df 반환
         return df
 
     def LT_trand_check(self, df):
@@ -486,19 +581,19 @@ class Data_Control():
                 return 0
 
         # 1) 필요한 컬럼들이 없으면 새로 만듦
-        needed_cols = ['Trend', 'RBW']
+        needed_cols = ['trend', 'RBW']
         for col in needed_cols:
             if col not in df.columns:
                 df[col] = np.nan
 
         # 2) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
-        last_valid = df['Trend'].last_valid_index()
+        last_valid = df['trend'].last_valid_index()
         if last_valid is None:
             last_valid = -1  # 전부 NaN이면 -1로 설정
 
         # 3) MA 트렌드 및 횡보 상태 판별
         for i in range(last_valid + 1, len(df)):
-            if pd.notna(df.loc[i, 'Trend']):
+            if pd.notna(df.loc[i, 'trend']):
                 continue
             
             # 이동평균선 데이터
@@ -519,7 +614,7 @@ class Data_Control():
             trend_state = check_ma_trend(sma20, sma60, sma120, rbw)
 
             # Trend 컬럼에 상태 업데이트
-            df.loc[i, 'Trend'] = trend_state
+            df.loc[i, 'trend'] = trend_state
 
         return df
 
