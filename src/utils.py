@@ -95,6 +95,7 @@ def trend4_signal(data_core):
     추세 코드 4
     SMA20 > SMA120 > SMA60
     RBW < 1.1
+    
     """
     print(4)
 
