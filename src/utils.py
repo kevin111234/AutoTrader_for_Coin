@@ -59,64 +59,160 @@ def get_trend_info(df):
     )
 
 def trend1_signal(data_core):
+    """
+    추세 코드 1
+    SMA20 > SMA60 > SMA120
+    RBW > 1.1
+    변동성이 높고 전형적인 상승 추세 정렬 -> 보수적 매수, 적극적 매도도
+    과매수를 주의하고, 단기적 조정에 의한 급상승이 아닌지 꼭 확인해야 함.
+    rsi가 70 이상이거나, obv 기울기가 음수이거나, %b가 0.4 이하이면 매도
+    rsi가 70 이하, obv 기울기가 양수이면 매수, but 1시간봉 추세가 음수이거나 "buy_volume_ratio"가 0.5 이하이면 매수금지
+    """
     print(1)
 
 def trend2_signal(data_core):
+    """
+    추세 코드 2
+    SMA20 > SMA60 > SMA120
+    0.8 < RBW < 1.1
+    안정적인 상승추세 -> 이전 추세 확인!
+    """
     print(2)
 
 def trend3_signal(data_core):
+    """
+    추세 코드 3
+    SMA20 > SMA60 > SMA120
+    RBW < 0.8
+    상승 이후 조정 국면 -> 이전 추세 확인 필수!
+    """
     print(3)
 
 # --------------------------
 
 def trend4_signal(data_core):
+    """
+    추세 코드 4
+    SMA20 > SMA120 > SMA60
+    RBW < 1.1
+    """
     print(4)
 
 def trend5_signal(data_core):
+    """
+    추세 코드 5
+    SMA20 > SMA120 > SMA60
+    0.8 < RBW < 1.1
+    """
     print(5)
 
 def trend6_signal(data_core):
+    """
+    추세 코드 6
+    SMA20 > SMA120 > SMA60
+    RBW < 0.8
+    """
     print(6)
 
 # -------------------------
 
 def trend7_signal(data_core):
+    """
+    추세 코드 7
+    SMA60 > SMA20 > SMA120
+    RBW < 1.1
+    """
     print(7)
 
 def trend8_signal(data_core):
+    """
+    추세 코드 8
+    SMA60 > SMA20 > SMA120
+    0.8 < RBW < 1.1
+    """
     print(8)
 
 def trend9_signal(data_core):
+    """
+    추세 코드 9
+    SMA60 > SMA20 > SMA120
+    RBW < 0.8
+    """
     print(9)
 
 #-------------------------
 
 def trend_1_signal(data_core):
+    """
+    추세 코드 -1
+    SMA60 > SMA120 > SMA20
+    RBW < 1.1
+    """
     print(-1)
 
 def trend_2_signal(data_core):
+    """
+    추세 코드 -2
+    SMA60 > SMA120 > SMA20
+    0.8 < RBW < 1.1
+    """
     print(-2)
 
 def trend_3_signal(data_core):
+    """
+    추세 코드 -3
+    SMA60 > SMA120 > SMA20
+    RBW < 0.8
+    """
     print(-3)
 
 # -----------------------
 
 def trend_4_signal(data_core):
+    """
+    추세 코드 -4
+    SMA120 > SMA20 > SMA60
+    RBW < 1.1
+    """
     print(-4)
 
 def trend_5_signal(data_core):
+    """
+    추세 코드 -5
+    SMA120 > SMA20 > SMA60
+    0.8 < RBW < 1.1
+    """
     print(-5)
 
 def trend_6_signal(data_core):
+    """
+    추세 코드 -6
+    SMA120 > SMA20 > SMA60
+    RBW < 0.8
+    """
     print(-6)
 
 # -----------------------4
 def trend_7_signal(data_core):
+    """
+    추세 코드 -7
+    SMA120 > SMA60 > SMA20
+    RBW < 1.1
+    """
     print(-7)
 
 def trend_8_signal(data_core):
+    """
+    추세 코드 -7
+    SMA120 > SMA60 > SMA20
+    0.8 < RBW < 1.1
+    """
     print(-8)
 
 def trend_9_signal(data_core):
+    """
+    추세 코드 -7
+    SMA120 > SMA60 > SMA20
+    RBW < 0.8
+    """
     print(-9)

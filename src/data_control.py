@@ -415,7 +415,7 @@ class Data_Control():
         """
 
         # MA 트렌드 판별 함수
-        def check_ma_trend(sma20, sma60, sma120, rbw, tol_ratio=0.005):
+        def check_ma_trend(sma20, sma60, sma120, rbw, tol_ratio=0.0005):
             """
             이동평균선 상태 및 상대 밴드폭(RBW)을 바탕으로 추세 상태를 정수로 매핑하는 함수
             
