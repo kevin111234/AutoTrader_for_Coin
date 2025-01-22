@@ -42,14 +42,12 @@ class Strategy:
             # 3) 보조 지표 계산 == rsi, obv, obv_diff, 5일 거래량 평균, 매수세 비중
             # 3-1) 1분봉
             last_1m = df_1m.iloc[-1]
-            rsi_1m = last_1m["rsi"]
             obv_1m = last_1m["obv"]
             obv_past_1m = (df_1m["obv"].iloc[ -(obv_lookback + 1) : -1].mean()) / obv_lookback
             obv_diff_1m = obv_1m - obv_past_1m
 
             # 3-2) 5분봉
             last_5m = df_5m.iloc[-1]
-            rsi_5m = last_5m["rsi"]
             obv_5m = last_5m["obv"]
             obv_past_5m = (df_5m["obv"].iloc[ -(obv_lookback + 1) : -1].mean()) / obv_lookback
             obv_diff_5m = obv_5m - obv_past_5m
@@ -80,18 +78,16 @@ class Strategy:
               "t2_trend_1h":t2_trend_1h,           # 1시간봉 직전의 직전 추세
               "t2_1h":t2_1h,                       # 1시간봉 직전 추세 지속시간
 
-              "rsi_1m":rsi_1m,                     # 1분봉 rsi
-              "obv_1m":obv_1m,                     # 1분봉 obv
-              "obv_diff_1m":obv_diff_1m,           # 1분봉 obv와 이전 10개 봉 obv 평균의 편차 (obv의 기울기를 간단하게 나타냄.)
-
-              "rsi_5m":rsi_5m,                     # 5분봉 rsi
-              "obv_5m":obv_5m,                     # 5분봉 obv
-              "obv_diff_5m":obv_diff_5m,           # 5분봉 obv와 이전 10개 봉 obv 평균의 편차 (obv의 기울기를 간단하게 나타냄.)
-              
               "volume_ratio":volume_ratio,         # 거래량이 최근 평균보다 높으면 1보다 크고, 낮으면 1보다 작음
               "buy_volume_ratio":buy_volume_ratio, # 총 거래량 중 시장가 매수 비율
+
+              "last_1m":last_1m,
+              "obv_diff_1m":obv_diff_1m,
+
+              "last_5m":last_5m,
+              "obv_diff_5m":obv_diff_5m,
             }
-        
+
         try:
             data_core = data_source(data_dict)
             trend_score = data_core["current_trend_5m"]
