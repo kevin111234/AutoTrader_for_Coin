@@ -264,12 +264,11 @@ class Data_Control():
         1) OBV(On-Balance Volume) 계산
           - 이미 계산된 구간( NaN이 아닌 부분 )은 건너뛰고, NaN인 곳만 업데이트
           - OBV[i] = OBV[i-1] ± volume  (종가 상승/하락 시)
-        2) 최근 p개 봉(또는 일)에 대한 OBV 고점/저점 계산
+        2) 최근 p개 봉(또는 일)에 대한 OBV 고점/저점 계산 (현재 OBV 제외)
           - obv_max_p, obv_min_p
         3) (고점 - 현재값) 기울기, (저점 - 현재값) 기울기
           - 예: obv_slope_from_max = ( current_obv - max_obv_in_p ) / p
           - 예: obv_slope_from_min = ( current_obv - min_obv_in_p ) / p
-            (혹은 max - current 로 할지, current - max 로 할지는 자유)
         4) 반환: df ( obv, obv_slope_from_max, obv_slope_from_min 컬럼 포함 )
         """
 
@@ -323,7 +322,7 @@ class Data_Control():
                 df.loc[i, obv_col] = prev_obv
 
         # ---------------------------
-        # 2) p개 구간의 OBV 고점/저점 계산
+        # 2) p개 구간의 OBV 고점/저점 계산 (현재 OBV 제외)
         # ---------------------------
         # 고점/저점 컬럼의 last_valid
         last_valid_max = df[obv_max_col].last_valid_index()
@@ -344,17 +343,22 @@ class Data_Control():
             if pd.isna(current_obv_val):
                 continue  # OBV가 NaN이면 건너뜀
 
-            # p봉 전부터 i까지 구간
-            if i < p - 1:
-                # p-1 개 이전 인덱스가 유효하지 않으면 패스
+            # p봉 전부터 i-1까지 구간 (현재 i는 제외)
+            if i < p:
+                # p개 이전 인덱스가 유효하지 않으면 패스
                 continue
 
             # 이미 값 있으면 스킵
             if (not pd.isna(df.loc[i, obv_max_col])) and (not pd.isna(df.loc[i, obv_min_col])):
                 continue
 
-            start_idx = i - (p - 1)
-            obv_subset = df.loc[start_idx:i, obv_col]
+            start_idx = i - p
+            end_idx = i - 1
+            obv_subset = df.loc[start_idx:end_idx, obv_col]
+
+            if len(obv_subset) < p:
+                # 충분한 데이터가 없으면 패스
+                continue
 
             df.loc[i, obv_max_col] = obv_subset.max()
             df.loc[i, obv_min_col] = obv_subset.min()
@@ -388,8 +392,8 @@ class Data_Control():
 
             # (현재 OBV - 고점) / p
             # 질문에서 "고점 - 현재값 기울기"라고 했으니 부호 반대로 할 수도 있음
-            df.loc[i, slope_from_max_col] = (current_obv_val - max_val) / p
-            df.loc[i, slope_from_min_col] = (current_obv_val - min_val) / p
+            df.loc[i, slope_from_max_col] = (max_val - current_obv_val) / p
+            df.loc[i, slope_from_min_col] = (min_val - current_obv_val) / p
 
         # ---------------------------
         # 4) 반환
