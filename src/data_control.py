@@ -259,7 +259,7 @@ class Data_Control():
         return profile_df, sr_levels
 
     def cal_obv(self, df, price_col='Close', volume_col='Volume',
-                obv_col='obv', p=5):
+                obv_col='obv', period_1=5, period_2 = 60):
         """
         1) OBV(On-Balance Volume) 계산
           - 이미 계산된 구간( NaN이 아닌 부분 )은 건너뛰고, NaN인 곳만 업데이트
@@ -280,8 +280,8 @@ class Data_Control():
             df[obv_col] = np.nan
 
         # 고점/저점 & 기울기 컬럼들
-        obv_max_col = f'{obv_col}_max_{p}'
-        obv_min_col = f'{obv_col}_min_{p}'
+        obv_max_col = f'{obv_col}_max_{period_1}'
+        obv_min_col = f'{obv_col}_min_{period_1}'
         slope_from_max_col = f'{obv_col}_slope_from_max'
         slope_from_min_col = f'{obv_col}_slope_from_min'
 
@@ -294,11 +294,10 @@ class Data_Control():
         # ---------------------------
         last_valid = df[obv_col].last_valid_index()
         if last_valid is None:
-            last_valid = -1  # 전부 NaN이면 -1로 설정
+            last_valid = -1
 
         for i in range(last_valid + 1, len(df)):
             if i == 0:
-                # 맨 처음 값은 편의상 거래량 그대로 or 0 으로 시작
                 df.loc[i, obv_col] = df.loc[i, volume_col]
                 continue
 
@@ -314,13 +313,33 @@ class Data_Control():
 
             curr_vol = df.loc[i, volume_col]
 
-            if curr_price > prev_price:
-                df.loc[i, obv_col] = prev_obv + curr_vol
-            elif curr_price < prev_price:
-                df.loc[i, obv_col] = prev_obv - curr_vol
+            # period_2보다 작을 때는 기존 OBV 계산법 적용
+            if i <= period_2:
+                if curr_price > prev_price:
+                    df.loc[i, obv_col] = prev_obv + curr_vol
+                elif curr_price < prev_price:
+                    df.loc[i, obv_col] = prev_obv - curr_vol
+                else:
+                    df.loc[i, obv_col] = prev_obv
             else:
-                df.loc[i, obv_col] = prev_obv
+                # Rolling Window에서 가장 오래된 기간의 거래량 계산
+                oldest_vol = df.loc[i - period_2, volume_col]
+                oldest_price = df.loc[i - period_2, price_col]
 
+                if curr_price > prev_price:
+                    # 상승 시 최신 거래량 더하고, 가장 오래된 거래량의 영향 제거
+                    if oldest_price > df.loc[i - period_2 - 1, price_col]:
+                        df.loc[i, obv_col] = prev_obv + curr_vol - oldest_vol
+                    else:
+                        df.loc[i, obv_col] = prev_obv + curr_vol + oldest_vol
+                elif curr_price < prev_price:
+                    # 하락 시 최신 거래량 빼고, 가장 오래된 거래량의 영향 제거
+                    if oldest_price < df.loc[i - period_2 - 1, price_col]:
+                        df.loc[i, obv_col] = prev_obv - curr_vol + oldest_vol
+                    else:
+                        df.loc[i, obv_col] = prev_obv - curr_vol - oldest_vol
+                else:
+                    df.loc[i, obv_col] = prev_obv
         # ---------------------------
         # 2) p개 구간의 OBV 고점/저점 계산 (현재 OBV 제외)
         # ---------------------------
@@ -344,7 +363,7 @@ class Data_Control():
                 continue  # OBV가 NaN이면 건너뜀
 
             # p봉 전부터 i-1까지 구간 (현재 i는 제외)
-            if i < p:
+            if i < period_1:
                 # p개 이전 인덱스가 유효하지 않으면 패스
                 continue
 
@@ -352,11 +371,11 @@ class Data_Control():
             if (not pd.isna(df.loc[i, obv_max_col])) and (not pd.isna(df.loc[i, obv_min_col])):
                 continue
 
-            start_idx = i - p
+            start_idx = i - period_1
             end_idx = i - 1
             obv_subset = df.loc[start_idx:end_idx, obv_col]
 
-            if len(obv_subset) < p:
+            if len(obv_subset) < period_1:
                 # 충분한 데이터가 없으면 패스
                 continue
 
@@ -392,8 +411,8 @@ class Data_Control():
 
             # (현재 OBV - 고점) / p
             # 질문에서 "고점 - 현재값 기울기"라고 했으니 부호 반대로 할 수도 있음
-            df.loc[i, slope_from_max_col] = (max_val - current_obv_val) / p
-            df.loc[i, slope_from_min_col] = (min_val - current_obv_val) / p
+            df.loc[i, slope_from_max_col] = (max_val - current_obv_val) / period_1
+            df.loc[i, slope_from_min_col] = (min_val - current_obv_val) / period_1
 
         # ---------------------------
         # 4) 반환
@@ -450,7 +469,7 @@ class Data_Control():
             #     근접 판정이 있는 경우: sma120 <= sma60 <= sma20
             if (sma120 < sma60 or is_near(sma120, sma60)) and \
               (sma60 < sma20 or is_near(sma60, sma20)) and \
-              (sma120 < sma20):  # 가장 긴 ~ 가장 짧은 것 사이에선 일단 확실히 상승
+              (sma120 < sma20 and not is_near(sma20, sma120)):  # 가장 긴 ~ 가장 짧은 것 사이에선 일단 확실히 상승
                 if rbw > 1.1:
                     return 1
                 elif 0.8 <= rbw <= 1.1:
@@ -461,7 +480,7 @@ class Data_Control():
             # (B) 불안정 상승 배열: sma60 < sma120 < sma20
             elif (sma60 < sma120 or is_near(sma60, sma120)) and \
                 (sma120 < sma20 or is_near(sma120, sma20)) and \
-                (sma60 < sma20):
+                (sma60 < sma20 and not is_near(sma20, sma60)):
                 if rbw > 1.1:
                     return 4
                 elif 0.8 <= rbw <= 1.1:
@@ -472,7 +491,7 @@ class Data_Control():
             # (C) 약세 반등 배열: sma120 < sma20 < sma60
             elif (sma120 < sma20 or is_near(sma120, sma20)) and \
                 (sma20 < sma60 or is_near(sma20, sma60)) and \
-                (sma120 < sma60):
+                (sma120 < sma60 and not is_near(sma60, sma120)):
                 if rbw > 1.1:
                     return 7
                 elif 0.8 <= rbw <= 1.1:
@@ -483,7 +502,7 @@ class Data_Control():
             # (D) 강한 하락 배열: sma20 < sma120 < sma60
             elif (sma20 < sma120 or is_near(sma20, sma120)) and \
                 (sma120 < sma60 or is_near(sma120, sma60)) and \
-                (sma20 < sma60):
+                (sma20 < sma60 and not is_near(sma20, sma60)):
                 if rbw > 1.1:
                     return -1
                 elif 0.8 <= rbw <= 1.1:
@@ -494,7 +513,7 @@ class Data_Control():
             # (E) 불안정 하락 배열: sma60 < sma20 < sma120
             elif (sma60 < sma20 or is_near(sma60, sma20)) and \
                 (sma20 < sma120 or is_near(sma20, sma120)) and \
-                (sma60 < sma120):
+                (sma60 < sma120 and not is_near(sma60, sma120)):
                 if rbw > 1.1:
                     return -4
                 elif 0.8 <= rbw <= 1.1:
@@ -505,7 +524,7 @@ class Data_Control():
             # (F) 급격한 하락 배열: sma20 < sma60 < sma120
             elif (sma20 < sma60 or is_near(sma20, sma60)) and \
                 (sma60 < sma120 or is_near(sma60, sma120)) and \
-                (sma20 < sma120):
+                (sma20 < sma120 and not is_near(sma20, sma120)):
                 if rbw > 1.1:
                     return -7
                 elif 0.8 <= rbw <= 1.1:
