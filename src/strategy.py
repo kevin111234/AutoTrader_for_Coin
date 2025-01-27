@@ -90,74 +90,16 @@ class Strategy:
 
         try:
             data_core = data_source(data_dict)
-            trend_score = data_core["current_trend_5m"]
 
-            # 4) 기본 시그널 초기화
-            signal = "hold"
-            weight = 0
-            reason = ""
+            signal, weight, reason, stop_loss, take_profit = utils.trend_signal(data_core)
 
-            # 5) 추세 코드별 시그널 분기
-            # SMA20 > 60 > 120
-            if trend_score == 1:
-                signal, weight, reason = utils.trend1_signal(data_core)
-            elif trend_score == 2:
-                signal, weight, reason = utils.trend2_signal(data_core)
-            elif trend_score == 3:
-                signal, weight, reason = utils.trend3_signal(data_core)
-
-            # SMA60 < 120 < 20
-            elif trend_score == 4:
-                signal, weight, reason = utils.trend4_signal(data_core)
-            elif trend_score == 5:
-                signal, weight, reason = utils.trend5_signal(data_core)
-            elif trend_score == 6:
-                signal, weight, reason = utils.trend6_signal(data_core)
-
-            # SMa120 < 20 < 60
-            elif trend_score == 7:
-                signal, weight, reason = utils.trend7_signal(data_core)
-            elif trend_score == 8:
-                signal, weight, reason = utils.trend8_signal(data_core)
-            elif trend_score == 9:
-                signal, weight, reason = utils.trend9_signal(data_core)
-
-            # SMA20 < 120 < 60
-            elif trend_score == -1:
-                signal, weight, reason =utils.trend_1_signal(data_core)
-            elif trend_score == -2:
-                signal, weight, reason =utils.trend_2_signal(data_core)
-            elif trend_score == -3:
-                signal, weight, reason =utils.trend_3_signal(data_core)
-
-            # SMA60 < 20 < 120
-            elif trend_score == -4:
-                signal, weight, reason =utils.trend_4_signal(data_core)
-            elif trend_score == -5:
-                signal, weight, reason =utils.trend_5_signal(data_core)
-            elif trend_score == -6:
-                signal, weight, reason =utils.trend_6_signal(data_core)
-
-            # SMA20 < 60 < 120
-            elif trend_score == -7:
-                signal, weight, reason =utils.trend_7_signal(data_core)
-            elif trend_score == -8:
-                signal, weight, reason =utils.trend_8_signal(data_core)
-            elif trend_score == -9:
-                signal, weight, reason =utils.trend_9_signal(data_core)
-
-
-            else:
-                # 기본 hold
-                signal = "hold"
-                weight = 0
-                reason = f"No specific strategy for trend_score={trend_score}"
-
-            # 6) 결과 반환
+            # 결과 반환
             return {
                 "signal": signal,
                 "weight": weight,
                 "reason": reason,
+                "stop_loss":stop_loss,
+                "take_profit":take_profit,
                 "trend_5m": data_core["current_trend_5m"],
                 "trend_1h": data_core["current_trend_1h"],
             }

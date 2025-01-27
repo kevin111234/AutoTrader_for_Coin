@@ -466,10 +466,7 @@ class Data_Control():
                 return 10  # Code 10: 단기·중기·장기 선이 사실상 동일 -> 강한 횡보(추세 모호)
 
             # (A) 강한 상승 배열: sma120 < sma60 < sma20
-            #     근접 판정이 있는 경우: sma120 <= sma60 <= sma20
-            if (sma120 < sma60 or is_near(sma120, sma60)) and \
-              (sma60 < sma20 or is_near(sma60, sma20)) and \
-              (sma120 < sma20 and not is_near(sma20, sma120)):  # 가장 긴 ~ 가장 짧은 것 사이에선 일단 확실히 상승
+            if sma120 < sma60 < sma20:
                 if rbw > 1.1:
                     return 1
                 elif 0.8 <= rbw <= 1.1:
@@ -478,9 +475,7 @@ class Data_Control():
                     return 3
 
             # (B) 불안정 상승 배열: sma60 < sma120 < sma20
-            elif (sma60 < sma120 or is_near(sma60, sma120)) and \
-                (sma120 < sma20 or is_near(sma120, sma20)) and \
-                (sma60 < sma20 and not is_near(sma20, sma60)):
+            elif sma60 < sma120 < sma20:
                 if rbw > 1.1:
                     return 4
                 elif 0.8 <= rbw <= 1.1:
@@ -489,9 +484,7 @@ class Data_Control():
                     return 6
 
             # (C) 약세 반등 배열: sma120 < sma20 < sma60
-            elif (sma120 < sma20 or is_near(sma120, sma20)) and \
-                (sma20 < sma60 or is_near(sma20, sma60)) and \
-                (sma120 < sma60 and not is_near(sma60, sma120)):
+            elif sma120 < sma20 < sma60:
                 if rbw > 1.1:
                     return 7
                 elif 0.8 <= rbw <= 1.1:
@@ -500,9 +493,7 @@ class Data_Control():
                     return 9
 
             # (D) 강한 하락 배열: sma20 < sma120 < sma60
-            elif (sma20 < sma120 or is_near(sma20, sma120)) and \
-                (sma120 < sma60 or is_near(sma120, sma60)) and \
-                (sma20 < sma60 and not is_near(sma20, sma60)):
+            elif sma20 < sma120 < sma60:
                 if rbw > 1.1:
                     return -1
                 elif 0.8 <= rbw <= 1.1:
@@ -511,9 +502,7 @@ class Data_Control():
                     return -3
 
             # (E) 불안정 하락 배열: sma60 < sma20 < sma120
-            elif (sma60 < sma20 or is_near(sma60, sma20)) and \
-                (sma20 < sma120 or is_near(sma20, sma120)) and \
-                (sma60 < sma120 and not is_near(sma60, sma120)):
+            elif sma60 < sma20 < sma120:
                 if rbw > 1.1:
                     return -4
                 elif 0.8 <= rbw <= 1.1:
@@ -522,9 +511,7 @@ class Data_Control():
                     return -6
 
             # (F) 급격한 하락 배열: sma20 < sma60 < sma120
-            elif (sma20 < sma60 or is_near(sma20, sma60)) and \
-                (sma60 < sma120 or is_near(sma60, sma120)) and \
-                (sma20 < sma120 and not is_near(sma20, sma120)):
+            elif sma20 < sma60 < sma120:
                 if rbw > 1.1:
                     return -7
                 elif 0.8 <= rbw <= 1.1:
