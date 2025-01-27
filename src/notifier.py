@@ -8,6 +8,7 @@ class Notifier():
         self.client = Client(self.config.binance_access_key, self.config.binance_secret_key)
         self.slack = WebClient(token=self.config.slack_api_key)
         self.asset_info = {}
+        self.futures_asset_info = {}
         self.target_coins = ["USDT", ]
         coins = self.config.coin_tickers.split(" ")  # 환경 변수에서 코인 목록 불러오기
         for i in range(len(coins)):
@@ -129,7 +130,7 @@ class Notifier():
                 withdraw_available = float(balance['withdrawAvailable'])
 
                 # 2. 잔액 정보 저장
-                self.asset_info[asset] = {
+                self.futures_asset_info[asset] = {
                     "balance": balance_amount,
                     "withdraw_available": withdraw_available,
                     "positions": []
@@ -149,7 +150,7 @@ class Notifier():
                 leverage = int(position['leverage'])
 
                 if position_amt != 0:  # 포지션이 있을 경우만 저장
-                    self.asset_info[symbol] = {
+                    self.futures_asset_info[symbol] = {
                         "position_amt": position_amt,
                         "entry_price": entry_price,
                         "unrealized_profit": unrealized_profit,
@@ -234,8 +235,8 @@ class Notifier():
         """
         try:
             # 1. USDT 잔액 조회 (선물 계좌)
-            usdt_balance = float(self.asset_info.get("USDT", {}).get("balance", 0))
-            available_balance = float(self.asset_info.get("USDT", {}).get("withdraw_available", 0))
+            usdt_balance = float(self.futures_asset_info.get("USDT", {}).get("balance", 0))
+            available_balance = float(self.futures_asset_info.get("USDT", {}).get("withdraw_available", 0))
 
             # 2. 선물 계좌의 포지션 가치 계산
             coin_values = {}
@@ -246,7 +247,7 @@ class Notifier():
                     continue
 
                 # 선물 포지션 정보 가져오기
-                position_info = self.asset_info.get(f"{symbol}USDT", {})
+                position_info = self.futures_asset_info.get(f"{symbol}USDT", {})
                 position_amt = float(position_info.get("position_amt", 0))
                 entry_price = float(position_info.get("entry_price", 0))
 
@@ -342,7 +343,7 @@ class Notifier():
     ──────────────"""
 
             # 2. 선물 계좌 정보
-            usdt_futures_balance = self.asset_info.get("USDT", {}).get("balance", 0)
+            usdt_futures_balance = self.futures_asset_info.get("USDT", {}).get("balance", 0)
             total_futures_asset = usdt_futures_balance
 
             futures_message = f"""
@@ -353,7 +354,7 @@ class Notifier():
     """
 
             # 선물 자산 정보 추가
-            for symbol, info in self.asset_info.items():
+            for symbol, info in self.futures_asset_info.items():
                 if "USDT" not in symbol or symbol.replace("USDT", "") not in self.future_target_coins:
                     continue
 

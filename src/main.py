@@ -5,6 +5,7 @@ from config import Config
 from data_control import Data_Control
 from notifier import Notifier
 from strategy import Strategy
+from order_executor import Order
 
 def main():
     print("투자 프로그램을 시작합니다.")
@@ -19,6 +20,7 @@ def main():
     data_control = Data_Control()
     notifier = Notifier()
     strategy = Strategy()
+    order = Order()
 
     # 서버 시간과 로컬 시간 동기화
     local_time = int(time.time() * 1000)
@@ -96,7 +98,7 @@ def main():
     notifier.get_asset_info()
     notifier.get_futures_asset_info()
     spot_limit_amount = notifier.get_limit_amount()
-    future_limit_amount = notifier.futures_get_limit_amount
+    future_limit_amount = notifier.futures_get_limit_amount()
 
     notifier.send_asset_info(spot_limit_amount, future_limit_amount)
 
@@ -108,16 +110,21 @@ def main():
             notifier.get_futures_asset_info()
 
             # 보유량 0 체크 (USDT 제외)
-            all_zero = all(
+            spot_all_zero = all(
                 notifier.asset_info[coin]["total_quantity"] == 0
                 for coin in ticker_list
                 if coin != "USDT"
             )
 
             # 모든 암호화폐의 보유량이 0이면 매수 한도 업데이트
-            if all_zero:
-                limit_amounts = notifier.get_limit_amount()
-                print("매수 한도가 업데이트되었습니다.")
+            if spot_all_zero:
+                spot_limit_amount = notifier.get_limit_amount()
+                print("현물 매수 한도가 업데이트되었습니다.")
+
+            # 선물 자산정보의 길이가 1이면 선물 매매 한도 업데이트
+            if len(notifier.futures_asset_info) == 1:
+                future_limit_amount = notifier.futures_get_limit_amount()
+                print("선물 매매 한도가 업데이트되었습니다.")
 
             # 매수/매도 판단 로직
             for ticker in ticker_list:
@@ -151,6 +158,13 @@ def main():
                 signal = strategy.signal(initial_data[ticker])
 
                 # 주문 진행
+                if signal["signal"] == "buy":
+                    print("매수 주문 진행")
+                    order.buy()
+
+                elif signal["signal"] == "sell" and notifier.asset_info[ticker]["profit_rate"] >= 1:
+                    print("매도 주문 진행")
+                    order.sell
             
             if future_use:
                 for ticker in future_ticker_list:
@@ -179,7 +193,22 @@ def main():
                     signal = {}
                     signal = strategy.signal(futures_data[ticker])
 
-                        # 주문 진행
+                    # 주문 진행
+                    if signal["signal"] == " L_buy":
+                        print("롱 포지션 진입")
+                        order.L_buy()
+
+                    elif signal["signal"] == "L__sell":
+                        print("롱 포지션 정리")
+                        order.L_sell()
+
+                    elif signal["signal"] == "S_buy":
+                        print("숏 포지션 진입")
+                        order.S_buy()
+
+                    elif signal["signal"] == "S_sell":
+                        print("숏 포지션 정리")
+                        order.S_sell()
 
             time.sleep(10)
         except Exception as e:
