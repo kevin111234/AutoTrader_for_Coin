@@ -58,6 +58,25 @@ def get_trend_info(df):
         bars_since_t_minus_1,  # T-1 추세가 몇 봉 유지되었는지
     )
 
+def get_symbol_info(self, symbol):
+    """
+    심볼의 거래 제한 정보를 반환 (stepSize, minQty 포함)
+    """
+    try:
+        exchange_info = self.client.get_exchange_info()
+        for symbol_info in exchange_info["symbols"]:
+            if symbol_info["symbol"] == symbol:
+                for filter in symbol_info["filters"]:
+                    if filter["filterType"] == "LOT_SIZE":
+                        return {
+                            "stepSize": float(filter["stepSize"]),
+                            "minQty": float(filter["minQty"])
+                        }
+        raise ValueError(f"{symbol}의 거래 제한 정보를 찾을 수 없습니다.")
+    except Exception as e:
+        print(f"거래 제한 정보 조회 중 오류 발생: {e}")
+        return {"stepSize": 1.0, "minQty": 0.0}
+
 def trend_signal(data_core):
     """
     "current_trend_1m":    # 1분봉 현재 추세

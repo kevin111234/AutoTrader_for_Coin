@@ -95,6 +95,7 @@ class Strategy:
 
             # 결과 반환
             return {
+                "current_price": data_core["last_5m"]["Close"],
                 "signal": signal,
                 "weight": weight,
                 "reason": reason,
@@ -105,27 +106,3 @@ class Strategy:
             }
         except Exception as e:
             print(f"signal 함수 오류: {e}")
-
-class Position_Tracker:
-    def __init__(self):
-        # 포지션 가중치를 추적할 리스트
-        self.position_weight = []
-
-    def buy(self, weight_level):
-        # 최대 weight_level까지 모든 누락된 값 추가
-        for level in range(1, weight_level + 1):
-            if level not in self.position_weight:
-                self.position_weight.append(level)
-
-    def sell(self, weight_level):
-        # weight_level 만큼 5부터 삭제
-        for _ in range(weight_level):
-            if self.position_weight and self.position_weight[-1] == 5:
-                self.position_weight.pop()
-            elif self.position_weight:
-                max_level = max(self.position_weight)
-                self.position_weight.remove(max_level)
-
-    def __repr__(self):
-        # 현재 포지션 상태를 출력
-        return f"Current Position Weights: {self.position_weight}"
