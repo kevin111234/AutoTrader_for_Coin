@@ -127,7 +127,7 @@ class Notifier():
                     continue  # future_target_coins에 없는 자산은 건너뛰기
                 
                 balance_amount = float(balance['balance'])
-                withdraw_available = float(balance['withdrawAvailable'])
+                withdraw_available = float(balance.get('withdrawAvailable', balance['balance']))
 
                 # 2. 잔액 정보 저장
                 self.futures_asset_info[asset] = {
@@ -354,6 +354,10 @@ class Notifier():
     """
 
             # 선물 자산 정보 추가
+            for symbol in self.future_target_coins:
+                if symbol == "USDT":
+                    continue
+                futures_message += f"""{symbol}투자한도: {futures_limit_amount[symbol]}"""
             for symbol, info in self.futures_asset_info.items():
                 if "USDT" not in symbol or symbol.replace("USDT", "") not in self.future_target_coins:
                     continue

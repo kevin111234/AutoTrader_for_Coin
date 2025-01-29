@@ -50,7 +50,7 @@ def main():
         initial_data[symbol] = {}
         vp_data[symbol] = {}
         tpo_data[symbol] = {}
-        spot_symbol_info[symbol] = utils.get_symbol_info(f"{ticker}USDT")
+        spot_symbol_info[symbol] = utils.get_symbol_info(f"{symbol}USDT", client)
 
         # 1분봉, 5분봉, 1시간봉 각각 300개의 데이터 조회
         for timeframe in ["1m", "5m", "1h"]:
@@ -80,7 +80,7 @@ def main():
                 futures_data[symbol] = {}
                 futures_vp_data[symbol] = {}
                 futures_tpo_data[symbol] = {}
-                future_symbol_info[symbol] = utils.get_symbol_info(f"{ticker}USDT")
+                future_symbol_info[symbol] = utils.get_symbol_info(f"{symbol}USDT", client)
                 for timeframe in ["1m", "5m", "1h"]:
                     future_data = data_control.data(client, symbol, timeframe, limit=300, futures=True)
                     # 각 데이터에 대한 기술적 지표 계산
@@ -149,7 +149,7 @@ def main():
                 # -------------------------------------------------------------------------
                 # 매수/매도 판단
                 signal = {}
-                signal = strategy.signal(initial_data[ticker])
+                signal = strategy.signal(initial_data[ticker], False)
 
                 # 주문 진행
                 try:
@@ -195,7 +195,7 @@ def main():
                                     )
 
                     # 현물 매도 단계별 처리
-                    if signal["signal"] == "sell":
+                    elif signal["signal"] == "sell":
                         current_stage = buy_sell_status[ticker]["sell_stage"]
                         target_stage = signal.get("weight", 1)
 
@@ -225,6 +225,8 @@ def main():
                                         config.slack_error_channel_id,
                                         f"{ticker} {stage}단계 매도 실패: 주문 상태 확인 필요"
                                     )
+                        else:
+                            print("Hold")
                 except Exception as e:
                     print(f"현물 주문 중 오류: {e}")
 
@@ -256,7 +258,7 @@ def main():
                     # -------------------------------------------------------------------------
                     # 매수/매도 판단
                     signal = {}
-                    signal = strategy.signal(futures_data[ticker])
+                    signal = strategy.signal(futures_data[ticker], True)
 
                     # 현재 상태 확인
                     current_position = futures_status[ticker]["position"]
