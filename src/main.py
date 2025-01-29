@@ -312,7 +312,7 @@ def main():
                                         )
 
                         # 선물 숏 포지션 처리
-                        if signal["signal"] == "S_buy":
+                        elif signal["signal"] == "S_buy":
                             if current_position == "long":
                                 print(f"{ticker} 롱 포지션 정리")
                                 quantity = futures_status[ticker]["stage"] * future_limit_amount[ticker]
@@ -357,6 +357,72 @@ def main():
                                             config.slack_error_channel_id,
                                             f"{ticker} {stage}단계 숏 포지션 실패: 주문 상태 확인 필요"
                                         )
+                        elif signal["signal"] == "L_sell":
+                            # 롱 포지션 정리
+                            if current_position == "long":
+                                print(f"{ticker} 롱 포지션 정리 시작")
+
+                                # 현재 롱 포지션 수량 확인
+                                quantity = futures_status[ticker]["stage"] * future_limit_amount[ticker]
+                                symbol_info = future_symbol_info[ticker]
+                                step_size = symbol_info["stepSize"]
+                                min_qty = symbol_info["minQty"]
+
+                                # 소수점 처리 및 최소 주문량 확인
+                                quantity = (quantity // step_size) * step_size
+                                if quantity < min_qty:
+                                    print(f"{ticker} 롱 포지션 정리 실패: 최소 주문량({min_qty}) 미만")
+                                    notifier.send_slack_message(
+                                        config.slack_error_channel_id,
+                                        f"{ticker} 롱 포지션 정리 실패: 최소 주문량({min_qty}) 미만"
+                                    )
+                                else:
+                                    # 롱 포지션 정리 주문 실행
+                                    status = order.L_sell(symbol=f"{ticker}USDT", quantity=quantity)
+                                    if status and status.get("status") == "FILLED":
+                                        print(f"{ticker} 롱 포지션 정리 성공")
+                                        futures_status[ticker] = {"position": None, "stage": 0}
+                                    else:
+                                        print(f"{ticker} 롱 포지션 정리 실패: 주문 상태 미확인")
+                                        notifier.send_slack_message(
+                                            config.slack_error_channel_id,
+                                            f"{ticker} 롱 포지션 정리 실패: 주문 상태 확인 필요"
+                                        )
+
+                        elif signal["signal"] == "S_sell":
+                            # 숏 포지션 정리
+                            if current_position == "short":
+                                print(f"{ticker} 숏 포지션 정리 시작")
+
+                                # 현재 숏 포지션 수량 확인
+                                quantity = futures_status[ticker]["stage"] * future_limit_amount[ticker]
+                                symbol_info = future_symbol_info[ticker]
+                                step_size = symbol_info["stepSize"]
+                                min_qty = symbol_info["minQty"]
+
+                                # 소수점 처리 및 최소 주문량 확인
+                                quantity = (quantity // step_size) * step_size
+                                if quantity < min_qty:
+                                    print(f"{ticker} 숏 포지션 정리 실패: 최소 주문량({min_qty}) 미만")
+                                    notifier.send_slack_message(
+                                        config.slack_error_channel_id,
+                                        f"{ticker} 숏 포지션 정리 실패: 최소 주문량({min_qty}) 미만"
+                                    )
+                                else:
+                                    # 숏 포지션 정리 주문 실행
+                                    status = order.S_sell(symbol=f"{ticker}USDT", quantity=quantity)
+                                    if status and status.get("status") == "FILLED":
+                                        print(f"{ticker} 숏 포지션 정리 성공")
+                                        futures_status[ticker] = {"position": None, "stage": 0}
+                                    else:
+                                        print(f"{ticker} 숏 포지션 정리 실패: 주문 상태 미확인")
+                                        notifier.send_slack_message(
+                                            config.slack_error_channel_id,
+                                            f"{ticker} 숏 포지션 정리 실패: 주문 상태 확인 필요"
+                                        )
+
+                        else:
+                            print("Hold")
                     except Exception as e:
                         print(f"선물 주문 중 오류: {e}")
 
