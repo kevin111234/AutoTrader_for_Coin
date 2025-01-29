@@ -258,48 +258,166 @@ class Data_Control():
 
         return profile_df, sr_levels
 
-    def cal_obv(self, df, price_col='Close', volume_col='Volume'):
+    def cal_obv(self, df, price_col='Close', volume_col='Volume',
+                obv_col='obv', period_1=5, period_2 = 60):
         """
-        OBV(On-Balance Volume) 계산
-        - 이미 계산된 구간은 건너뛰고, NaN인 곳만 업데이트
-        - OBV[i] = OBV[i-1] + volume  (종가 상승 시)
-                = OBV[i-1] - volume  (종가 하락 시)
-                = OBV[i-1]           (종가 동일 시)
+        1) OBV(On-Balance Volume) 계산
+          - 이미 계산된 구간( NaN이 아닌 부분 )은 건너뛰고, NaN인 곳만 업데이트
+          - OBV[i] = OBV[i-1] ± volume  (종가 상승/하락 시)
+        2) 최근 p개 봉(또는 일)에 대한 OBV 고점/저점 계산 (현재 OBV 제외)
+          - obv_max_p, obv_min_p
+        3) (고점 - 현재값) 기울기, (저점 - 현재값) 기울기
+          - 예: obv_slope_from_max = ( current_obv - max_obv_in_p ) / p
+          - 예: obv_slope_from_min = ( current_obv - min_obv_in_p ) / p
+        4) 반환: df ( obv, obv_slope_from_max, obv_slope_from_min 컬럼 포함 )
         """
 
-        # 1) obv 컬럼 없으면 만들어 둠
-        if 'obv' not in df.columns:
-            df['obv'] = np.nan
+        # ---------------------------
+        # 0) 컬럼 준비
+        # ---------------------------
+        # obv가 없으면 생성
+        if obv_col not in df.columns:
+            df[obv_col] = np.nan
 
-        # 2) 마지막으로 유효한 인덱스 찾기
-        last_valid = df['obv'].last_valid_index()
+        # 고점/저점 & 기울기 컬럼들
+        obv_max_col = f'{obv_col}_max_{period_1}'
+        obv_min_col = f'{obv_col}_min_{period_1}'
+        slope_from_max_col = f'{obv_col}_slope_from_max'
+        slope_from_min_col = f'{obv_col}_slope_from_min'
+
+        for col in [obv_max_col, obv_min_col, slope_from_max_col, slope_from_min_col]:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        # ---------------------------
+        # 1) OBV 계산
+        # ---------------------------
+        last_valid = df[obv_col].last_valid_index()
         if last_valid is None:
-            last_valid = -1  # 전부 NaN이면 -1로 설정
+            last_valid = -1
 
-        # 3) last_valid + 1부터 끝까지 계산
         for i in range(last_valid + 1, len(df)):
-            # 맨 첫 행이면 초기값 설정 (볼륨 그대로 넣거나 0으로 시작 등 원하는 로직)
             if i == 0:
-                df.loc[i, 'obv'] = df.loc[i, volume_col]
+                df.loc[i, obv_col] = df.loc[i, volume_col]
                 continue
-            
+
             # 이미 값이 있으면 스킵
-            if not pd.isna(df.loc[i, 'obv']):
+            if not pd.isna(df.loc[i, obv_col]):
                 continue
-            
+
             prev_price = df.loc[i - 1, price_col]
             curr_price = df.loc[i, price_col]
-            prev_obv = df.loc[i - 1, 'obv'] if not pd.isna(df.loc[i - 1, 'obv']) else 0
+            prev_obv = df.loc[i - 1, obv_col]
+            if pd.isna(prev_obv):
+                prev_obv = 0
+
             curr_vol = df.loc[i, volume_col]
 
-            if curr_price > prev_price:
-                df.loc[i, 'obv'] = prev_obv + curr_vol
-            elif curr_price < prev_price:
-                df.loc[i, 'obv'] = prev_obv - curr_vol
+            # period_2보다 작을 때는 기존 OBV 계산법 적용
+            if i <= period_2:
+                if curr_price > prev_price:
+                    df.loc[i, obv_col] = prev_obv + curr_vol
+                elif curr_price < prev_price:
+                    df.loc[i, obv_col] = prev_obv - curr_vol
+                else:
+                    df.loc[i, obv_col] = prev_obv
             else:
-                # 가격이 동일하다면 변화 없음
-                df.loc[i, 'obv'] = prev_obv
+                # Rolling Window에서 가장 오래된 기간의 거래량 계산
+                oldest_vol = df.loc[i - period_2, volume_col]
+                oldest_price = df.loc[i - period_2, price_col]
 
+                if curr_price > prev_price:
+                    # 상승 시 최신 거래량 더하고, 가장 오래된 거래량의 영향 제거
+                    if oldest_price > df.loc[i - period_2 - 1, price_col]:
+                        df.loc[i, obv_col] = prev_obv + curr_vol - oldest_vol
+                    else:
+                        df.loc[i, obv_col] = prev_obv + curr_vol + oldest_vol
+                elif curr_price < prev_price:
+                    # 하락 시 최신 거래량 빼고, 가장 오래된 거래량의 영향 제거
+                    if oldest_price < df.loc[i - period_2 - 1, price_col]:
+                        df.loc[i, obv_col] = prev_obv - curr_vol + oldest_vol
+                    else:
+                        df.loc[i, obv_col] = prev_obv - curr_vol - oldest_vol
+                else:
+                    df.loc[i, obv_col] = prev_obv
+        # ---------------------------
+        # 2) p개 구간의 OBV 고점/저점 계산 (현재 OBV 제외)
+        # ---------------------------
+        # 고점/저점 컬럼의 last_valid
+        last_valid_max = df[obv_max_col].last_valid_index()
+        last_valid_min = df[obv_min_col].last_valid_index()
+        candidate_idx = []
+        if last_valid_max is not None:
+            candidate_idx.append(last_valid_max)
+        if last_valid_min is not None:
+            candidate_idx.append(last_valid_min)
+
+        if len(candidate_idx) > 0:
+            last_valid_highlow = min(candidate_idx)
+        else:
+            last_valid_highlow = -1
+
+        for i in range(last_valid_highlow + 1, len(df)):
+            current_obv_val = df.loc[i, obv_col]
+            if pd.isna(current_obv_val):
+                continue  # OBV가 NaN이면 건너뜀
+
+            # p봉 전부터 i-1까지 구간 (현재 i는 제외)
+            if i < period_1:
+                # p개 이전 인덱스가 유효하지 않으면 패스
+                continue
+
+            # 이미 값 있으면 스킵
+            if (not pd.isna(df.loc[i, obv_max_col])) and (not pd.isna(df.loc[i, obv_min_col])):
+                continue
+
+            start_idx = i - period_1
+            end_idx = i - 1
+            obv_subset = df.loc[start_idx:end_idx, obv_col]
+
+            if len(obv_subset) < period_1:
+                # 충분한 데이터가 없으면 패스
+                continue
+
+            df.loc[i, obv_max_col] = obv_subset.max()
+            df.loc[i, obv_min_col] = obv_subset.min()
+
+        # ---------------------------
+        # 3) (고점 - 현재값), (저점 - 현재값) 기울기 계산
+        # ---------------------------
+        # 여기서는 (현재 - 고점)/p, (현재 - 저점)/p 로 정의함
+        # 질문 내용이 "고점 - 현재값 기울기"였지만, 부호 방향을 어떻게 할지는 자유
+        # 원하는 대로 수정해서 쓰세요 :)
+        last_valid_slope_max = df[slope_from_max_col].last_valid_index()
+        last_valid_slope_min = df[slope_from_min_col].last_valid_index()
+        candidate_idx_2 = []
+        if last_valid_slope_max is not None:
+            candidate_idx_2.append(last_valid_slope_max)
+        if last_valid_slope_min is not None:
+            candidate_idx_2.append(last_valid_slope_min)
+
+        if len(candidate_idx_2) > 0:
+            last_valid_slope = min(candidate_idx_2)
+        else:
+            last_valid_slope = -1
+
+        for i in range(last_valid_slope + 1, len(df)):
+            current_obv_val = df.loc[i, obv_col]
+            max_val = df.loc[i, obv_max_col]
+            min_val = df.loc[i, obv_min_col]
+
+            if pd.isna(current_obv_val) or pd.isna(max_val) or pd.isna(min_val):
+                continue
+
+            # (현재 OBV - 고점) / p
+            # 질문에서 "고점 - 현재값 기울기"라고 했으니 부호 반대로 할 수도 있음
+            df.loc[i, slope_from_max_col] = (max_val - current_obv_val) / period_1
+            df.loc[i, slope_from_min_col] = (min_val - current_obv_val) / period_1
+
+        # ---------------------------
+        # 4) 반환
+        # ---------------------------
+        # 최종적으로 obv, obv_slope_from_max, obv_slope_from_min 등을 포함한 df 반환
         return df
 
     def LT_trand_check(self, df):
@@ -316,7 +434,7 @@ class Data_Control():
         """
 
         # MA 트렌드 판별 함수
-        def check_ma_trend(sma20, sma60, sma120, rbw):
+        def check_ma_trend(sma20, sma60, sma120, rbw, tol_ratio=0.005):
             """
             이동평균선 상태 및 상대 밴드폭(RBW)을 바탕으로 추세 상태를 정수로 매핑하는 함수
             
@@ -329,108 +447,96 @@ class Data_Control():
             반환:
             int - 트렌드 상태 (-9 ~ 9)
             """
-            # 강한 상승 배열 sma120 < sma60 < sma20
-            if sma120 < sma60 < sma20:
-                # 1. 급격한 상승, 과매수 위험 구간
-                if 1.1 < rbw:
-                    return 1
+            # -------------------------------------------------------
+            # 1) 보조 함수: 두 SMA가 tol_ratio 이내로 근접한지 판별
+            # -------------------------------------------------------
+            def is_near(a, b, tolerance=tol_ratio):
+                # 분모를 b 혹은 (a+b)/2 등으로 조정 가능
+                # 절대값 기준으로 쓰고 싶다면 abs(a - b) < 특정값으로 변경
+                return abs(a - b) <= abs(b) * tolerance
 
-                # 2. 안정적 상승 추세
+            near_20_60 = is_near(sma20, sma60)
+            near_20_120 = is_near(sma20, sma120)
+            near_60_120 = is_near(sma60, sma120)
+
+            # -------------------------------------------------------
+            # 모든 SMA(20,60,120)가 서로 근접 → 완전 박스권
+            # -------------------------------------------------------
+            if near_20_60 and near_20_120 and near_60_120:
+                return 10  # Code 10: 단기·중기·장기 선이 사실상 동일 -> 강한 횡보(추세 모호)
+
+            # (A) 강한 상승 배열: sma120 < sma60 < sma20
+            if sma120 < sma60 < sma20:
+                if rbw > 1.1:
+                    return 1
                 elif 0.8 <= rbw <= 1.1:
                     return 2
-
-                # 3. 상승 추세에서 조정 가능성
-                elif rbw < 0.8:
+                else:  # rbw < 0.8
                     return 3
 
-            # 불안정 상승 배열 sma60 < sma120 < sma20
+            # (B) 불안정 상승 배열: sma60 < sma120 < sma20
             elif sma60 < sma120 < sma20:
-                # 4. 상승 반전 시도, 변동성 높음
-                if 1.1 < rbw:
+                if rbw > 1.1:
                     return 4
-
-                # 5. 상승 전환 박스권
                 elif 0.8 <= rbw <= 1.1:
                     return 5
-
-                # 6. 상승 전환 준비
-                elif rbw < 0.8:
+                else:
                     return 6
 
-            # 약세 반등 배열 sma120 < sma20 < sma60
+            # (C) 약세 반등 배열: sma120 < sma20 < sma60
             elif sma120 < sma20 < sma60:
-                # 7. 일시적 반등, 불안정
-                if 1.1 < rbw:
+                if rbw > 1.1:
                     return 7
-
-                # 8. 약세장 속 반등
                 elif 0.8 <= rbw <= 1.1:
                     return 8
-
-                # 9. 하락 추세 재진입 가능성
-                elif rbw < 0.8:
+                else:
                     return 9
 
-            # 강한 하락 배열 sma20 < sma120 < sma60
+            # (D) 강한 하락 배열: sma20 < sma120 < sma60
             elif sma20 < sma120 < sma60:
-            # -1. 급격한 하락, 과매도 위험
-                if 1.1 < rbw:
+                if rbw > 1.1:
                     return -1
-
-                # -2. 안정적 하락 추세
                 elif 0.8 <= rbw <= 1.1:
                     return -2
-
-                # -3. 하락 추세에서 반등 가능성
-                elif rbw < 0.8:
+                else:
                     return -3
 
-            # 불안정 하락 배열 sma60 < sma20 < sma120
+            # (E) 불안정 하락 배열: sma60 < sma20 < sma120
             elif sma60 < sma20 < sma120:
-                # -4. 하락 반전 시도, 변동성 높음
-                if 1.1 < rbw:
+                if rbw > 1.1:
                     return -4
-
-                # -5. 하락 전환 박스권
                 elif 0.8 <= rbw <= 1.1:
                     return -5
-
-                # -6. 하락 전환 준비
-                elif rbw < 0.8:
+                else:
                     return -6
 
-            # 급격한 하락 배열 sma20 < sma60 < sma120
+            # (F) 급격한 하락 배열: sma20 < sma60 < sma120
             elif sma20 < sma60 < sma120:
-                # -7. 패닉셀, 과매도 구간 진입 가능성
-                if 1.1 < rbw:
+                if rbw > 1.1:
                     return -7
-
-                # -8. 급락 후 안정화 진행중
-                elif 0.8 <= rbw <=1.1:
+                elif 0.8 <= rbw <= 1.1:
                     return -8
-
-                # -9. 급락 추세 소멸, 기술적 반등 가능성 존재
-                elif rbw < 0.8:
+                else:
                     return -9
 
-            # 그 외 상황 (예외적 횡보, 추세 모호)
+            # (G) 그 외 → 횡보 or 추세 모호
             else:
                 return 0
 
         # 1) 필요한 컬럼들이 없으면 새로 만듦
-        needed_cols = ['Trend', 'RBW']
+        needed_cols = ['trend', 'RBW']
         for col in needed_cols:
             if col not in df.columns:
                 df[col] = np.nan
 
         # 2) 'Trend' 컬럼을 기준으로 last_valid_index 가져오기
-        last_valid = df['Trend'].last_valid_index()
+        last_valid = df['trend'].last_valid_index()
         if last_valid is None:
             last_valid = -1  # 전부 NaN이면 -1로 설정
 
         # 3) MA 트렌드 및 횡보 상태 판별
         for i in range(last_valid + 1, len(df)):
-            if pd.notna(df.loc[i, 'Trend']):
+            if pd.notna(df.loc[i, 'trend']):
                 continue
             
             # 이동평균선 데이터
@@ -451,7 +557,7 @@ class Data_Control():
             trend_state = check_ma_trend(sma20, sma60, sma120, rbw)
 
             # Trend 컬럼에 상태 업데이트
-            df.loc[i, 'Trend'] = trend_state
+            df.loc[i, 'trend'] = trend_state
 
         return df
 
