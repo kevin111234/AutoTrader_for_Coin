@@ -58,12 +58,12 @@ def get_trend_info(df):
         bars_since_t_minus_1,  # T-1 추세가 몇 봉 유지되었는지
     )
 
-def get_symbol_info(self, symbol):
+def get_symbol_info(symbol, client):
     """
     심볼의 거래 제한 정보를 반환 (stepSize, minQty 포함)
     """
     try:
-        exchange_info = self.client.get_exchange_info()
+        exchange_info = client.get_exchange_info()
         for symbol_info in exchange_info["symbols"]:
             if symbol_info["symbol"] == symbol:
                 for filter in symbol_info["filters"]:
@@ -77,7 +77,7 @@ def get_symbol_info(self, symbol):
         print(f"거래 제한 정보 조회 중 오류 발생: {e}")
         return {"stepSize": 1.0, "minQty": 0.0}
 
-def trend_signal(data_core):
+def trend_signal(data_core, future):
     """
     "current_trend_1m":    # 1분봉 현재 추세
     "t1_trend_1m":         # 1분봉 직전 추세
@@ -121,5 +121,131 @@ def trend_signal(data_core):
     reason = ""
     stop_loss = 0.98
     take_profit = 1.02
+
+    if data_core["current_trend_5m"] == 1 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 2 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 3 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 4 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 5 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 6 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 7 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 8 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 9 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -1 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -2 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -3 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -4 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -5 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -6 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -7 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -8 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -9 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == -9 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 0 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+
+    elif data_core["current_trend_5m"] == 10 :
+        if future:
+            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        else:
+            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
 
     return signal, weight, reason, stop_loss, take_profit

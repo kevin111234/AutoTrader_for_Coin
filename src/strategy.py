@@ -7,7 +7,7 @@ class Strategy:
     def __init__(self):
         pass
 
-    def signal(self, data_dict):
+    def signal(self, data_dict, future):
         """
         data_dict: {
             "1m": DataFrame(...),
@@ -17,8 +17,8 @@ class Strategy:
         }
         각 DataFrame에는 다음과 같은 컬럼이 있다고 가정:
         [Open Time, Open, High, Low, Close, Volume, Taker Buy Base Asset Volume, Taker Sell Base Asset Volume,
-          SMA_20, SMA_60, SMA_120, rsi, rsi_signal, middle_boll, upper_boll, lower_boll,
-          percent_b, bandwidth, obv, ...]
+        SMA_20, SMA_60, SMA_120, rsi, rsi_signal, middle_boll, upper_boll, lower_boll,
+        percent_b, bandwidth, obv, ...]
         
         rsi_buy_threshold / rsi_sell_threshold : RSI 매수/매도 임계값 (과매도, 과매수)
         obv_lookback : OBV 비교를 위해 과거 몇 봉 전의 OBV를 볼지
@@ -60,38 +60,38 @@ class Strategy:
                 buy_volume_ratio = last_5m["Taker Buy Base Asset Volume"] / last_5m["Volume"]
             
             return {
-              "current_trend_1m":current_trend_1m, # 1분봉 현재 추세
-              "t1_trend_1m":t1_trend_1m,           # 1분봉 직전 추세
-              "t1_1m":t1_1m,                       # 1분봉 현재 추세 지속시간
-              "t2_trend_1m":t2_trend_1m,           # 1분봉 직전의 직전 추세
-              "t2_1m":t2_1m,                       # 1분봉 직전 추세 지속시간
+                "current_trend_1m":current_trend_1m, # 1분봉 현재 추세
+                "t1_trend_1m":t1_trend_1m,           # 1분봉 직전 추세
+                "t1_1m":t1_1m,                       # 1분봉 현재 추세 지속시간
+                "t2_trend_1m":t2_trend_1m,           # 1분봉 직전의 직전 추세
+                "t2_1m":t2_1m,                       # 1분봉 직전 추세 지속시간
 
-              "current_trend_5m":current_trend_5m, # 5분봉 현재 추세
-              "t1_trend_5m":t1_trend_5m,           # 5분봉 직전 추세
-              "t1_5m":t1_5m,                       # 5분봉 현재 추세 지속시간
-              "t2_trend_5m":t2_trend_5m,           # 5분봉 직전의 직전 추세
-              "t2_5m":t2_5m,                       # 5분봉 직전 추세 지속시간
+                "current_trend_5m":current_trend_5m, # 5분봉 현재 추세
+                "t1_trend_5m":t1_trend_5m,           # 5분봉 직전 추세
+                "t1_5m":t1_5m,                       # 5분봉 현재 추세 지속시간
+                "t2_trend_5m":t2_trend_5m,           # 5분봉 직전의 직전 추세
+                "t2_5m":t2_5m,                       # 5분봉 직전 추세 지속시간
 
-              "current_trend_1h":current_trend_1h, # 1시간봉 현재 추세 
-              "t1_trend_1h":t1_trend_1h,           # 1시간봉 직전 추세
-              "t1_1h":t1_1h,                       # 1시간봉 현재 추세 지속시간
-              "t2_trend_1h":t2_trend_1h,           # 1시간봉 직전의 직전 추세
-              "t2_1h":t2_1h,                       # 1시간봉 직전 추세 지속시간
+                "current_trend_1h":current_trend_1h, # 1시간봉 현재 추세 
+                "t1_trend_1h":t1_trend_1h,           # 1시간봉 직전 추세
+                "t1_1h":t1_1h,                       # 1시간봉 현재 추세 지속시간
+                "t2_trend_1h":t2_trend_1h,           # 1시간봉 직전의 직전 추세
+                "t2_1h":t2_1h,                       # 1시간봉 직전 추세 지속시간
 
-              "volume_ratio":volume_ratio,         # 거래량이 최근 평균보다 높으면 1보다 크고, 낮으면 1보다 작음
-              "buy_volume_ratio":buy_volume_ratio, # 총 거래량 중 시장가 매수 비율
+                "volume_ratio":volume_ratio,         # 거래량이 최근 평균보다 높으면 1보다 크고, 낮으면 1보다 작음
+                "buy_volume_ratio":buy_volume_ratio, # 총 거래량 중 시장가 매수 비율
 
-              "last_1m":last_1m,
-              "obv_diff_1m":obv_diff_1m,
+                "last_1m":last_1m,
+                "obv_diff_1m":obv_diff_1m,
 
-              "last_5m":last_5m,
-              "obv_diff_5m":obv_diff_5m,
+                "last_5m":last_5m,
+                "obv_diff_5m":obv_diff_5m,
             }
 
         try:
             data_core = data_source(data_dict)
 
-            signal, weight, reason, stop_loss, take_profit = utils.trend_signal(data_core)
+            signal, weight, reason, stop_loss, take_profit = utils.trend_signal(data_core, future)
 
             # 결과 반환
             return {
