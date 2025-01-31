@@ -7,6 +7,7 @@ from notifier import Notifier
 from strategy import Strategy
 from order_executor import Order
 import utils
+import math
 
 def main():
     print("투자 프로그램을 시작합니다.")
@@ -118,8 +119,24 @@ def main():
             notifier.get_asset_info()
             notifier.get_futures_asset_info()
 
-            spot_limit_amount = notifier.get_limit_amount()
-            future_limit_amount = notifier.futures_get_limit_amount()
+            spot_all_zero = all(
+                notifier.asset_info[coin]["total_quantity"] == 0
+                for coin in ticker_list
+                if coin != "USDT"
+            )
+            # 모든 암호화폐의 보유량이 0이면 매수 한도 업데이트
+            if spot_all_zero:
+                spot_limit_amount = notifier.get_limit_amount()
+                print("현물 매수 한도가 업데이트되었습니다.")
+            # 선물 자산정보의 길이가 1이면 선물 매매 한도 업데이트
+            has_positions = any(
+                notifier.futures_asset_info.get(f"{symbol}USDT", {}).get("position_amt", 0) != 0
+                for symbol in future_ticker_list
+            )
+
+            if not has_positions:  # ✅ 포지션이 하나도 없을 경우에만 업데이트 실행
+                future_limit_amount = notifier.futures_get_limit_amount()
+                print("선물 매매 한도가 업데이트되었습니다.")
 
             # 매수/매도 판단 로직
             for ticker in ticker_list:
@@ -161,13 +178,13 @@ def main():
                         # 진행된 단계보다 높은 단계의 매수만 실행
                         if target_stage > current_stage:
                             for stage in range(current_stage + 1, target_stage + 1):
-                                entry_price = signal["last_5m"]["Close"]
+                                entry_price = signal["current_price"]
                                 quantity = spot_limit_amount.get(ticker, 0) / entry_price / (6 - stage)
                                 # 소수점 및 최소 주문량 처리
                                 symbol_info = spot_symbol_info[ticker]
                                 step_size = symbol_info["stepSize"]
                                 min_qty = symbol_info["minQty"]
-                                quantity = (quantity // step_size) * step_size
+                                quantity = math.floor(quantity / step_size) * step_size
 
                                 if quantity < min_qty:
                                     print(f"{ticker} {stage}단계 매수 실패: 최소 주문량({min_qty}) 미만")
@@ -175,10 +192,22 @@ def main():
 
                                 # 매수 진행
                                 print(f"{ticker} {stage}단계 매수 진행: 수량 {quantity}")
+                                message = f"""
+매수 진행 신호 발생
+- 매수 비중: {signal["weight"]}
+- 매수 근거: {signal["reason"]}
+- 손절 퍼센트: {signal["stop_loss"]}
+- 익절 퍼센트: {signal["take_profit"]}
+- 5분봉 트렌드 코드: {signal["trend_5m"]}
+- 1시간봉 트렌드 코드: {signal["trend_1h"]}
+"""
+                                notifier.send_slack_message(config.slack_trade_channel_id, message)
 
                                 status = order.buy(symbol=f"{ticker}USDT", quantity=quantity)
                                 if status and status.get("status") == "FILLED":
                                     print(f"{ticker} {stage}단계 매수 성공")
+                                    message = f"{ticker} {stage}단계 매수수 성공"
+                                    notifier.send_slack_message(config.slack_trade_channel_id, message)
                                     order.place_oco_order(
                                         symbol=f"{ticker}USDT",
                                         quantity=quantity,
@@ -208,16 +237,26 @@ def main():
                                 symbol_info = spot_symbol_info[ticker]
                                 step_size = symbol_info["stepSize"]
                                 min_qty = symbol_info["minQty"]
-                                available_quantity = (available_quantity // step_size) * step_size  # stepSize에 맞게 내림
+                                available_quantity = math.floor(available_quantity / step_size) * step_size
                                 if available_quantity < min_qty:
                                     print(f"{ticker} {stage}단계 매도 실패: 최소 주문량({min_qty}) 미만")
                                     continue
 
                                 # 매도 진행
                                 print(f"{ticker} {stage}단계 매도 진행: 수량 {available_quantity}")
+                                message = f"""
+매도 진행 신호 발생
+- 매도 비중: {signal["weight"]}
+- 매도 근거: {signal["reason"]}
+- 5분봉 트렌드 코드: {signal["trend_5m"]}
+- 1시간봉 트렌드 코드: {signal["trend_1h"]}
+"""
+                                notifier.send_slack_message(config.slack_trade_channel_id, message)
                                 status = order.sell(symbol=f"{ticker}USDT", quantity=available_quantity)
                                 if status and status.get("status") == "FILLED":
                                     print(f"{ticker} {stage}단계 매도 성공")
+                                    message = f"{ticker} {stage}단계 매도 성공"
+                                    notifier.send_slack_message(config.slack_trade_channel_id, message)
                                     buy_sell_status[ticker]["sell_stage"] = stage
                                 else:
                                     print(f"{ticker} {stage}단계 매도 실패: 주문 상태 미확인")
@@ -275,29 +314,42 @@ def main():
                                 if status and status.get("status") == "FILLED":
                                     futures_status[ticker] = {"position": None, "stage": 0}
                                     print(f"{ticker} 숏 포지션 정리 성공")
+                                    notifier.send_slack_message(config.slack_trade_channel_id, f"{ticker} 숏 포지션 정리 성공")
                                 else:
                                     print(f"{ticker} 숏 포지션 정리 실패")
+                                    notifier.send_slack_message(config.slack_error_channel_id, f"{ticker} 숏 포지션 정리 실패")
                                     continue
 
                             if current_position != "long" or target_stage > current_stage:
                                 for stage in range(current_stage + 1, target_stage + 1):
-                                    entry_price = signal["last_5m"]["Close"]
+                                    entry_price = signal["current_price"]
                                     quantity = future_limit_amount[ticker] / entry_price / (6 - stage)
                                     symbol_info = future_symbol_info[ticker]
                                     step_size = symbol_info["stepSize"]
                                     min_qty = symbol_info["minQty"]
 
                                     # 소수점 처리 및 최소 주문량 확인
-                                    quantity = (quantity // step_size) * step_size
+                                    quantity = math.floor(quantity / step_size) * step_size
                                     if quantity < min_qty:
                                         print(f"{ticker} {stage}단계 롱 포지션 실패: 최소 주문량({min_qty}) 미만")
                                         continue
 
                                     # 롱 포지션 진입
                                     print(f"{ticker} {stage}단계 롱 포지션 진입: 수량 {quantity}")
+                                    message = f"""
+롱 포지션 진행 신호 발생
+- 매수 비중: {signal["weight"]}
+- 매수 근거: {signal["reason"]}
+- 손절 퍼센트: {signal["stop_loss"]}
+- 익절 퍼센트: {signal["take_profit"]}
+- 5분봉 트렌드 코드: {signal["trend_5m"]}
+- 1시간봉 트렌드 코드: {signal["trend_1h"]}
+"""
+                                    notifier.send_slack_message(config.slack_trade_channel_id, message)
                                     status = order.L_buy(symbol=f"{ticker}USDT", quantity=quantity)
                                     if status and status.get("status") == "FILLED":
                                         print(f"{ticker} {stage}단계 롱 포지션 성공")
+                                        notifier.send_slack_message(config.slack_trade_channel_id, f"{ticker} {stage}단계 롱 포지션 성공")
                                         order.place_oco_order(
                                             symbol=f"{ticker}USDT",
                                             quantity=quantity,
@@ -322,29 +374,40 @@ def main():
                                 if status and status.get("status") == "FILLED":
                                     futures_status[ticker] = {"position": None, "stage": 0}
                                     print(f"{ticker} 롱 포지션 정리 성공")
+                                    notifier.send_slack_message(config.slack_trade_channel_id, f"{ticker} 롱 포지션 정리 성공")
                                 else:
                                     print(f"{ticker} 롱 포지션 정리 실패")
+                                    notifier.send_slack_message(config.slack_error_channel_id, f"{ticker} 롱 포지션 정리 실패")
                                     continue
 
                             if current_position != "short" or target_stage > current_stage:
                                 for stage in range(current_stage + 1, target_stage + 1):
-                                    entry_price = signal["last_5m"]["Close"]
+                                    entry_price = signal["current_price"]
                                     quantity = future_limit_amount[ticker] / entry_price / (6 - stage)
                                     symbol_info = future_symbol_info[ticker]
                                     step_size = symbol_info["stepSize"]
                                     min_qty = symbol_info["minQty"]
 
                                     # 소수점 처리 및 최소 주문량 확인
-                                    quantity = (quantity // step_size) * step_size
+                                    quantity = math.floor(quantity / step_size) * step_size
                                     if quantity < min_qty:
                                         print(f"{ticker} {stage}단계 숏 포지션 실패: 최소 주문량({min_qty}) 미만")
                                         continue
 
                                     # 숏 포지션 진입
                                     print(f"{ticker} {stage}단계 숏 포지션 진입: 수량 {quantity}")
+                                    message = f"""
+숏 포지션 진행 신호 발생
+- 매도 비중: {signal["weight"]}
+- 매도 근거: {signal["reason"]}
+- 5분봉 트렌드 코드: {signal["trend_5m"]}
+- 1시간봉 트렌드 코드: {signal["trend_1h"]}
+"""
+                                    notifier.send_slack_message(config.slack_trade_channel_id, message)
                                     status = order.S_buy(symbol=f"{ticker}USDT", quantity=quantity)
                                     if status and status.get("status") == "FILLED":
                                         print(f"{ticker} {stage}단계 숏 포지션 성공")
+                                        notifier.send_slack_message(config.slack_trade_channel_id, f"{ticker} {stage}단계 숏 포지션 진입 성공")
                                         order.place_oco_order(
                                             symbol=f"{ticker}USDT",
                                             quantity=quantity,
@@ -371,7 +434,7 @@ def main():
                                 min_qty = symbol_info["minQty"]
 
                                 # 소수점 처리 및 최소 주문량 확인
-                                quantity = (quantity // step_size) * step_size
+                                quantity = math.floor(quantity / step_size) * step_size
                                 if quantity < min_qty:
                                     print(f"{ticker} 롱 포지션 정리 실패: 최소 주문량({min_qty}) 미만")
                                     notifier.send_slack_message(
@@ -403,7 +466,7 @@ def main():
                                 min_qty = symbol_info["minQty"]
 
                                 # 소수점 처리 및 최소 주문량 확인
-                                quantity = (quantity // step_size) * step_size
+                                quantity = math.floor(quantity / step_size) * step_size
                                 if quantity < min_qty:
                                     print(f"{ticker} 숏 포지션 정리 실패: 최소 주문량({min_qty}) 미만")
                                     notifier.send_slack_message(

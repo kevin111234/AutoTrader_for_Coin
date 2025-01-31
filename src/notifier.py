@@ -81,7 +81,7 @@ class Notifier():
                     continue
 
                 # 6. 평균 매수 가격 계산
-                trades = self.client.get_my_trades(f"{asset}USDT")
+                trades = self.client.get_my_trades(symbol=f"{asset}USDT")
                 total_cost = 0
                 total_trade_quantity = 0
 
