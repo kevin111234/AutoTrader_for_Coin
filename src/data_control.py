@@ -554,7 +554,7 @@ class Data_Control():
             df.loc[i, 'RBW'] = rbw
 
             # MA 트렌드 판별 (새로운 함수 활용)
-            trend_state = check_ma_trend(sma20, sma60, sma120, rbw)
+            trend_state = int(check_ma_trend(sma20, sma60, sma120, rbw))
 
             # Trend 컬럼에 상태 업데이트
             df.loc[i, 'trend'] = trend_state

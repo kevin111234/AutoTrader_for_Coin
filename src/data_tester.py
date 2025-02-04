@@ -95,19 +95,12 @@ def tester():
                 futures_tpo_data[symbol][timeframe] = pd.DataFrame([sr_levels])  # 리스트를 DataFrame으로 변환
 
     # 엑셀 저장 (하나의 파일 내에 여러 시트로 저장)
-    with pd.ExcelWriter("data/market_data.xlsx", engine="openpyxl") as writer:
-        for symbol in ticker_list:
-            for timeframe in ["1m", "5m", "1h"]:
-                initial_data[symbol][timeframe].to_excel(writer, sheet_name=f"init_{symbol}_{timeframe}")
-                vp_data[symbol][timeframe].to_excel(writer, sheet_name=f"vp_{symbol}_{timeframe}")
-                tpo_data[symbol][timeframe].to_excel(writer, sheet_name=f"tpo_{symbol}_{timeframe}")
+    for symbol in ticker_list:
+        print(utils.data_source(initial_data[symbol]))
 
-        if future_use:
-            for symbol in future_ticker_list:
-                for timeframe in ["1m", "5m", "1h"]:
-                    futures_data[symbol][timeframe].to_excel(writer, sheet_name=f"fut_{symbol}_{timeframe}")
-                    futures_vp_data[symbol][timeframe].to_excel(writer, sheet_name=f"fut_vp_{symbol}_{timeframe}")
-                    futures_tpo_data[symbol][timeframe].to_excel(writer, sheet_name=f"fut_tpo_{symbol}_{timeframe}")
+    if future_use:
+        for symbol in future_ticker_list:
+            print(utils.data_source(futures_data[symbol]))
 
 if __name__ == "__main__":
     tester()
