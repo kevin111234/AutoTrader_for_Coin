@@ -15,8 +15,8 @@ class Notifier():
             self.target_coins.append(coins[i])
         self.future_target_coins = ["USDT", ]
         future_coins = self.config.futures_coin_tickers.split(" ")
-        for i in range(len(future_coins)):
-            self.future_target_coins.append(coins[i])
+        for j in range(len(future_coins)):
+            self.future_target_coins.append(future_coins[j])
 
     def get_asset_info(self):
         """반환 형태 예시
