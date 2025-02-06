@@ -76,12 +76,14 @@ def data_source(data_dict,
 
             # 3) 보조 지표 계산 == rsi, obv, obv_diff, 5일 거래량 평균, 매수세 비중
             # 3-1) 1분봉
+            previous_1m = df_1m.iloc[-2]
             last_1m = df_1m.iloc[-1]
             obv_1m = last_1m["obv"]
             obv_past_1m = (df_1m["obv"].iloc[ -(obv_lookback + 1) : -1].mean()) / obv_lookback
             obv_diff_1m = obv_1m - obv_past_1m
 
             # 3-2) 5분봉
+            previous_5m = df_5m.iloc[-2]
             last_5m = df_5m.iloc[-1]
             obv_5m = last_5m["obv"]
             obv_past_5m = (df_5m["obv"].iloc[ -(obv_lookback + 1) : -1].mean()) / obv_lookback
@@ -116,9 +118,11 @@ def data_source(data_dict,
                 "volume_ratio":volume_ratio,         # 거래량이 최근 평균보다 높으면 1보다 크고, 낮으면 1보다 작음
                 "buy_volume_ratio":buy_volume_ratio, # 총 거래량 중 시장가 매수 비율
 
+                "previous_1m": previous_1m,
                 "last_1m":last_1m,
                 "obv_diff_1m":obv_diff_1m,
 
+                "previous_5m": previous_5m,
                 "last_5m":last_5m,
                 "obv_diff_5m":obv_diff_5m,
             }
@@ -188,10 +192,48 @@ def trend_signal(data_core, future):
     take_profit = 1.02
 
     if data_core["current_trend_5m"] == 1 :
+        # 진입 조건
+        if data_core["t1_trend_5m"] in [7, 8, 9] and data_core["t1_5m"] < 5:
+            reason += f"| 골든크로스 발생 "
+            weight += 1
+        if data_core["volume_ratio"] > 1:
+            reason += f"| 거래량 평균 대비 {data_core["volume_ratio"]}배 "
+            weight += 1
+        if data_core["buy_volume_ratio"] > 0.5:
+            reason += f"| 시장가 매수 체결 비율 {data_core["buy_volume_ratio"]} 이상 "
+            weight += 1
+        if data_core["last_5m"]["percent_b"] >= 0.5:
+            reason += f"| %b 0.4 이상 "
+            weight += 1
+        if data_core["last_5m"]["obv_slope_from_max"] < 0 or data_core["obv_diff_5m"] > 0:
+            reason += f"| obv 상승추세 확인 "
+            weight += 1
+        
+        # 진입 제한 조건
+        if data_core["last_5m"]["percent_b"] >= 1.0:
+            weight = weight // 2
+        if data_core["last_5m"]["rsi"] >= 70:
+            weight = weight //2
+
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            if weight > 0:
+                signal = "L_buy"
+                stop_loss = 0.95
+                take_profit = 1.1
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            if weight > 0:
+                signal = "buy"
+                stop_loss = 0.98
+                take_profit = 1.04
+
+        # 손절매 조건
+        if data_core["last_5m"]["SMA_60"]*0.99 >= data_core["last_5m"]["Close"]:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+            reason = "| 60이평선 지지 붕괴, 손절 |"
 
     elif data_core["current_trend_5m"] == 2 :
         if future:
