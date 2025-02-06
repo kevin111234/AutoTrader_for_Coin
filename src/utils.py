@@ -212,8 +212,10 @@ def trend_signal(data_core, future):
         # 진입 제한 조건
         if data_core["last_5m"]["percent_b"] >= 1.0:
             weight = weight // 2
+            reason += "| 상단 밴드 돌파 -> 추격 진입 약화 "
         if data_core["last_5m"]["rsi"] >= 70:
             weight = weight //2
+            reason += "| RSI 과매수 경계 "
 
         if future:
             if weight > 0:
@@ -233,13 +235,52 @@ def trend_signal(data_core, future):
             else:
                 signal = "sell"
             weight = 5
-            reason = "| 60이평선 지지 붕괴, 손절 |"
+            reason = "| 60이평선 지지 붕괴, 손절 "
 
     elif data_core["current_trend_5m"] == 2 :
-        if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
-        else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+        # 진입 조건
+        if data_core["t1_trend_5m"] in [7, 8, 9] and data_core["t1_5m"] < 5:
+            reason += "| 골든크로스 발생 "
+            weight += 1
+        if data_core["volume_ratio"] > 1:
+            reason += f"| 거래량 평균 대비 {data_core['volume_ratio']}배 "
+            weight += 1
+        if data_core["buy_volume_ratio"] > 0.5:
+            reason += f"| 시장가 매수 체결 비율 {data_core['buy_volume_ratio']} 이상 "
+            weight += 1
+        if data_core["last_5m"]["percent_b"] >= 0.4:
+            reason += "| %b 0.3 이상 "
+            weight += 1
+        if data_core["last_5m"]["obv_slope_from_max"] < 0 or data_core["obv_diff_5m"] > 0:
+            reason += "| OBV 상승추세 확인 "
+            weight += 1
+
+        # 진입 제한 조건
+        if data_core["last_5m"]["percent_b"] >= 0.95:
+            weight = weight // 2
+            reason += "| 상단 근접 -> 추격 진입 약화 "
+        if data_core["last_5m"]["rsi"] >= 70:
+            weight = weight // 2
+            reason += "| RSI 과매수 경계 "
+
+        if weight > 0:
+            if future:
+                signal = "L_buy"
+                stop_loss = 0.97
+                take_profit = 1.08
+            else:
+                signal = "buy"
+                stop_loss = 0.98
+                take_profit = 1.04
+
+        # 손절매 조건
+        if data_core["last_5m"]["SMA_60"] * 0.99 >= data_core["last_5m"]["Close"]:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+            reason += "| 60이평선 지지 붕괴, 손절 "
 
     elif data_core["current_trend_5m"] == 3 :
         if future:
