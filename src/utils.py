@@ -333,110 +333,110 @@ def trend_signal(data_core, future):
 
     elif data_core["current_trend_5m"] == 4 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 5 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 6 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 7 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 8 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 9 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -1 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -2 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -3 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -4 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -5 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -6 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -7 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -8 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -9 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == -9 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 0 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     elif data_core["current_trend_5m"] == 10 :
         if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
         else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+            pass
 
     return signal, weight, reason, stop_loss, take_profit
