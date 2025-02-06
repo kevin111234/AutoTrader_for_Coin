@@ -282,11 +282,54 @@ def trend_signal(data_core, future):
             weight = 5
             reason += "| 60이평선 지지 붕괴, 손절 "
 
-    elif data_core["current_trend_5m"] == 3 :
-        if future:
-            print(f"선물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
-        else:
-            print(f"현물 시장의 {data_core["current_trend_5m"]} 시그널을 생성합니다.")
+    if data_core["current_trend_5m"] == 3:
+        # 진입조건
+        if data_core["volume_ratio"] > 1:
+            reason += f"| 거래량 {data_core['volume_ratio']}배↑ "
+            weight += 1
+        if data_core["buy_volume_ratio"] > 0.5:
+            reason += f"| 매수우위 {data_core['buy_volume_ratio']} "
+            weight += 1
+        if data_core["last_5m"]["obv_diff_5m"] > 0:
+            reason += "| OBV 단기 상승 "
+            weight += 1
+        if data_core["last_5m"]["obv_slope_from_max"] < 0:
+            reason += "| OBV max 초과 가능성 "
+            weight += 1
+        if data_core["last_5m"]["percent_b"] >= 1.0 and data_core["previous_5m"]["percent_b"] >= 1.0:
+            reason += "| %b >= 1.0 (상단이탈) "
+            weight += 1
+
+        # 제한 조건
+        if data_core["volume_ratio"] < 0.8:
+            weight -= 1
+            reason += "| 거래량 미미 "
+        if data_core["buy_volume_ratio"] < 0.4:
+            weight -= 1
+            reason += "| 매수세 부족 "
+
+        # RSI가 80↑ 등 극단 과매수면 상승 돌파 후 급락 가능성
+        if data_core["last_5m"]["rsi"] >= 80:
+            weight = weight // 2
+            reason += "| RSI 극과매수 -> 진입 축소 "
+
+        if weight > 0:
+            if future:
+                signal = "L_buy"
+                stop_loss = 0.98
+                take_profit = 1.10
+            else:
+                signal = "buy"
+                stop_loss = 0.98
+                take_profit = 1.05
+
+        if data_core["last_5m"]["Close"] <= data_core["last_5m"]["SMA_60"] * 0.99:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+            reason += "| 60이평 이탈 손절 "
 
     elif data_core["current_trend_5m"] == 4 :
         if future:
