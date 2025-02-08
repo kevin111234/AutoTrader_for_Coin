@@ -191,252 +191,153 @@ def trend_signal(data_core, future):
     stop_loss = 0.98
     take_profit = 1.02
 
-    if data_core["current_trend_5m"] == 1 :
-        # 진입 조건
-        if data_core["t1_trend_5m"] in [7, 8, 9] and data_core["t1_5m"] < 5:
-            reason += f"| 골든크로스 발생 "
-            weight += 1
-        if data_core["volume_ratio"] > 1:
-            reason += f"| 거래량 평균 대비 {data_core["volume_ratio"]}배 "
-            weight += 1
-        if data_core["buy_volume_ratio"] > 0.5:
-            reason += f"| 시장가 매수 체결 비율 {data_core["buy_volume_ratio"]} 이상 "
-            weight += 1
-        if data_core["last_5m"]["percent_b"] >= 0.5:
-            reason += f"| %b 0.4 이상 "
-            weight += 1
-        if data_core["last_5m"]["obv_slope_from_max"] < 0 or data_core["obv_diff_5m"] > 0:
-            reason += f"| obv 상승추세 확인 "
-            weight += 1
+    # 1. 기본 데이터 준비
+    current_price = data_core["last_5m"]["Close"]
+    
+    # RSI 및 거래량 데이터
+    rsi_1m = data_core["last_1m"].get("rsi", 50)
+    volume_ratio = data_core.get("volume_ratio", 1)
+    buy_volume_ratio = data_core.get("buy_volume_ratio", 0.5)
+    
+    # 볼린저 밴드 데이터
+    bb_upper = data_core["last_5m"].get("upper_boll")
+    bb_lower = data_core["last_5m"].get("lower_boll")
+    bb_middle = data_core["last_5m"].get("middle_boll")
+    percent_b = data_core["last_5m"].get("percent_b", 0.5)
+    
+    # 추세 데이터
+    trend_1h = data_core.get("current_trend_1h", 0)
+    trend_5m = data_core.get("current_trend_5m", 0)
+    
+    # OBV 데이터
+    obv_diff = data_core.get("obv_diff_5m", 0)
+    
+    # Funding Rate (선물 전용)
+    funding_rate = data_core["last_5m"].get("fundingRate", 0) if future else 0
+    
+    # 2. 신호 및 기본값 초기화
+    signal = "hold"
+    weight = 0
+    reason = []
+    stop_loss = current_price * 0.98
+    take_profit = current_price * 1.02
+    
+    # 3. 시장 상태 분석
+    t_5m = 0 if trend_5m == 10 else trend_5m
+    t_1h = 0 if trend_1h == 10 else trend_1h
+    # 추세 점수 계산 (1시간봉 가중치 2배)
+    trend_score = (t_5m + (t_1h * 2)) / 3
+    
+    # RSI 상태
+    is_oversold = rsi_1m < 30
+    is_overbought = rsi_1m > 70
+    
+    # 볼린저 밴드 상태
+    is_near_lower = percent_b < 0.2
+    is_near_upper = percent_b > 0.8
+    
+    # 거래량 상태
+    strong_buy_volume = volume_ratio > 1.2 and buy_volume_ratio > 0.6
+    strong_sell_volume = volume_ratio > 1.2 and buy_volume_ratio < 0.4
+    
+    # 4. 선물 거래 신호 생성
+    if future:
+        long_conditions = 0
+        short_conditions = 0
         
-        # 진입 제한 조건
-        if data_core["last_5m"]["percent_b"] >= 1.0:
-            weight = weight // 2
-            reason += "| 상단 밴드 돌파 -> 추격 진입 약화 "
-        if data_core["last_5m"]["rsi"] >= 70:
-            weight = weight //2
-            reason += "| RSI 과매수 경계 "
-
-        if future:
-            if weight > 0:
-                signal = "L_buy"
-                stop_loss = 0.95
-                take_profit = 1.1
-        else:
-            if weight > 0:
-                signal = "buy"
-                stop_loss = 0.98
-                take_profit = 1.04
-
-        # 손절매 조건
-        if data_core["last_5m"]["SMA_60"]*0.99 >= data_core["last_5m"]["Close"]:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-            reason = "| 60이평선 지지 붕괴, 손절 "
-
-    elif data_core["current_trend_5m"] == 2 :
-        # 진입 조건
-        if data_core["t1_trend_5m"] in [7, 8, 9] and data_core["t1_5m"] < 5:
-            reason += "| 골든크로스 발생 "
-            weight += 1
-        if data_core["volume_ratio"] > 1:
-            reason += f"| 거래량 평균 대비 {data_core['volume_ratio']}배 "
-            weight += 1
-        if data_core["buy_volume_ratio"] > 0.5:
-            reason += f"| 시장가 매수 체결 비율 {data_core['buy_volume_ratio']} 이상 "
-            weight += 1
-        if data_core["last_5m"]["percent_b"] >= 0.4:
-            reason += "| %b 0.3 이상 "
-            weight += 1
-        if data_core["last_5m"]["obv_slope_from_max"] < 0 or data_core["obv_diff_5m"] > 0:
-            reason += "| OBV 상승추세 확인 "
-            weight += 1
-
-        # 진입 제한 조건
-        if data_core["last_5m"]["percent_b"] >= 0.95:
-            weight = weight // 2
-            reason += "| 상단 근접 -> 추격 진입 약화 "
-        if data_core["last_5m"]["rsi"] >= 70:
-            weight = weight // 2
-            reason += "| RSI 과매수 경계 "
-
-        if weight > 0:
-            if future:
-                signal = "L_buy"
-                stop_loss = 0.97
-                take_profit = 1.08
-            else:
-                signal = "buy"
-                stop_loss = 0.98
-                take_profit = 1.04
-
-        # 손절매 조건
-        if data_core["last_5m"]["SMA_60"] * 0.99 >= data_core["last_5m"]["Close"]:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-            reason += "| 60이평선 지지 붕괴, 손절 "
-
-    if data_core["current_trend_5m"] == 3:
-        # 진입조건
-        if data_core["volume_ratio"] > 1:
-            reason += f"| 거래량 {data_core['volume_ratio']}배↑ "
-            weight += 1
-        if data_core["buy_volume_ratio"] > 0.5:
-            reason += f"| 매수우위 {data_core['buy_volume_ratio']} "
-            weight += 1
-        if data_core["last_5m"]["obv_diff_5m"] > 0:
-            reason += "| OBV 단기 상승 "
-            weight += 1
-        if data_core["last_5m"]["obv_slope_from_max"] < 0:
-            reason += "| OBV max 초과 가능성 "
-            weight += 1
-        if data_core["last_5m"]["percent_b"] >= 1.0 and data_core["previous_5m"]["percent_b"] >= 1.0:
-            reason += "| %b >= 1.0 (상단이탈) "
-            weight += 1
-
-        # 제한 조건
-        if data_core["volume_ratio"] < 0.8:
-            weight -= 1
-            reason += "| 거래량 미미 "
-        if data_core["buy_volume_ratio"] < 0.4:
-            weight -= 1
-            reason += "| 매수세 부족 "
-
-        # RSI가 80↑ 등 극단 과매수면 상승 돌파 후 급락 가능성
-        if data_core["last_5m"]["rsi"] >= 80:
-            weight = weight // 2
-            reason += "| RSI 극과매수 -> 진입 축소 "
-
-        if weight > 0:
-            if future:
-                signal = "L_buy"
-                stop_loss = 0.98
-                take_profit = 1.10
-            else:
-                signal = "buy"
-                stop_loss = 0.98
-                take_profit = 1.05
-
-        if data_core["last_5m"]["Close"] <= data_core["last_5m"]["SMA_60"] * 0.99:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-            reason += "| 60이평 이탈 손절 "
-
-    elif data_core["current_trend_5m"] == 4 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 5 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 6 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 7 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 8 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 9 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -1 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -2 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -3 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -4 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -5 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -6 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -7 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -8 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -9 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == -9 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 0 :
-        if future:
-            pass
-        else:
-            pass
-
-    elif data_core["current_trend_5m"] == 10 :
-        if future:
-            pass
-        else:
-            pass
+        # 롱 포지션 진입 조건
+        if is_oversold:
+            long_conditions += 1
+        if is_near_lower and trend_score > 0:
+            long_conditions += 1
+        if strong_buy_volume:
+            long_conditions += 1
+        if obv_diff > 0:
+            long_conditions += 1
+        if funding_rate < -0.01:  # 네거티브 펀딩
+            long_conditions += 1
+            
+        # 숏 포지션 진입 조건
+        if is_overbought:
+            short_conditions += 1
+        if is_near_upper and trend_score < 0:
+            short_conditions += 1
+        if strong_sell_volume:
+            short_conditions += 1
+        if obv_diff < 0:
+            short_conditions += 1
+        if funding_rate > 0.01:  # 포지티브 펀딩
+            short_conditions += 1
+        
+        # 롱 진입/청산 신호
+        if long_conditions >= 3 and trend_score > 0:
+            signal = "L_buy"
+            weight = min(long_conditions, 4)
+            stop_loss = current_price * 0.985  # 레버리지 고려하여 손절폭 축소
+            take_profit = current_price * 1.025
+            reason.append(f"롱 진입: {long_conditions}개 조건 충족")
+            
+        elif trend_score < -0.5 or (is_overbought and trend_score < 0):
+            signal = "L_sell"
+            weight = 5  # 빠른 청산 필요
+            reason.append("롱 청산: 추세 반전")
+            
+        # 숏 진입/청산 신호
+        elif short_conditions >= 3 and trend_score < 0:
+            signal = "S_buy"
+            weight = min(short_conditions, 4)
+            stop_loss = current_price * 1.015  # 레버리지 고려하여 손절폭 축소
+            take_profit = current_price * 0.975
+            reason.append(f"숏 진입: {short_conditions}개 조건 충족")
+            
+        elif trend_score > 0.5 or (is_oversold and trend_score > 0):
+            signal = "S_sell"
+            weight = 5  # 빠른 청산 필요
+            reason.append("숏 청산: 추세 반전")
+            
+    # 5. 현물 거래 신호 생성
+    else:
+        buy_conditions = 0
+        sell_conditions = 0
+        
+        # 매수 조건 체크
+        if is_oversold:
+            buy_conditions += 1
+        if is_near_lower and trend_score > 0:
+            buy_conditions += 1
+        if strong_buy_volume:
+            buy_conditions += 1
+        if obv_diff > 0:
+            buy_conditions += 1
+            
+        # 매도 조건 체크
+        if is_overbought:
+            sell_conditions += 1
+        if is_near_upper and trend_score < 0:
+            sell_conditions += 1
+        if strong_sell_volume:
+            sell_conditions += 1
+        if obv_diff < 0:
+            sell_conditions += 1
+        
+        # 최종 신호 결정
+        if buy_conditions >= 3:
+            signal = "buy"
+            weight = min(buy_conditions, 5)
+            reason.append(f"현물 매수: {buy_conditions}개 조건 충족")
+            
+        elif sell_conditions >= 3:
+            signal = "sell"
+            weight = min(sell_conditions, 5)
+            reason.append(f"현물 매도: {sell_conditions}개 조건 충족")
+        
+    # 6. 변동성에 따른 보정
+    if "bandwidth" in data_core["last_5m"]:
+        bandwidth = data_core["last_5m"]["bandwidth"]
+        if bandwidth > 0.05:  # 높은 변동성
+            weight = max(1, weight - 1)
+            reason.append("변동성 고려 주문량 감소")
+    
+    reason = " + ".join(reason)
 
     return signal, weight, reason, stop_loss, take_profit
