@@ -45,7 +45,7 @@ def main():
     spot_symbol_info = {}
     future_symbol_info = {}
 
-    buy_sell_status = {ticker: {"buy_stage": 0, "sell_stage": 0} for ticker in ticker_list}
+    buy_sell_status = {ticker: {"buy_stage": 0} for ticker in ticker_list}
     futures_status = {ticker: {"position": None, "stage": 0} for ticker in future_ticker_list}
     for symbol in ticker_list:
         initial_data[symbol] = {}
@@ -175,12 +175,13 @@ def main():
                         current_stage = buy_sell_status[ticker]["buy_stage"]
                         target_stage = signal.get("weight", 1)
 
-                        # 진행된 단계보다 높은 단계의 매수만 실행
+                        # 목표 stage가 현재 stage보다 클 경우, 해당 단계까지 매수
                         if target_stage > current_stage:
                             for stage in range(current_stage + 1, target_stage + 1):
                                 entry_price = signal["current_price"]
-                                quantity = spot_limit_amount.get(ticker, 0) / entry_price / (6 - stage)
-                                # 소수점 및 최소 주문량 처리
+                                quantity = (int(spot_limit_amount.get(ticker, 0)) * 0.2) / entry_price
+
+                                # 최소 주문량 확인
                                 symbol_info = spot_symbol_info[ticker]
                                 step_size = symbol_info["stepSize"]
                                 min_qty = symbol_info["minQty"]
@@ -192,7 +193,11 @@ def main():
 
                                 # 매수 진행
                                 print(f"{ticker} {stage}단계 매수 진행: 수량 {quantity}")
-                                message = f"""
+                                status = order.buy(symbol=f"{ticker}USDT", quantity=quantity)
+
+                                if status and status.get("status") == "FILLED":
+                                    print(f"{ticker} {stage}단계 매수 성공")
+                                    message = f"""
 매수 진행 신호 발생
 - 매수 비중: {signal["weight"]}
 - 매수 근거: {signal["reason"]}
@@ -201,13 +206,8 @@ def main():
 - 5분봉 트렌드 코드: {signal["trend_5m"]}
 - 1시간봉 트렌드 코드: {signal["trend_1h"]}
 """
-                                notifier.send_slack_message(config.slack_trade_channel_id, message)
-
-                                status = order.buy(symbol=f"{ticker}USDT", quantity=quantity)
-                                if status and status.get("status") == "FILLED":
-                                    print(f"{ticker} {stage}단계 매수 성공")
-                                    message = f"{ticker} {stage}단계 매수수 성공"
                                     notifier.send_slack_message(config.slack_trade_channel_id, message)
+                                    buy_sell_status[ticker]["buy_stage"] = stage  # ✅ 현재 보유 단계 업데이트
                                     order.place_oco_order(
                                         symbol=f"{ticker}USDT",
                                         quantity=quantity,
@@ -215,35 +215,29 @@ def main():
                                         take_profit_percent=signal["take_profit"],
                                         stop_loss_percent=signal["stop_loss"]
                                     )
-                                    buy_sell_status[ticker]["buy_stage"] = stage
                                 else:
                                     print(f"{ticker} {stage}단계 매수 실패: 주문 상태 미확인")
                                     notifier.send_slack_message(
                                         config.slack_error_channel_id,
                                         f"{ticker} {stage}단계 매수 실패: 주문 상태 확인 필요"
                                     )
+                        else:
+                            print("Hold")
 
                     # 현물 매도 단계별 처리
                     elif signal["signal"] == "sell":
-                        current_stage = buy_sell_status[ticker]["sell_stage"]
+                        current_stage = buy_sell_status[ticker]["buy_stage"]
                         target_stage = signal.get("weight", 1)
 
-                        if target_stage > current_stage:
-                            for stage in range(current_stage + 1, target_stage + 1):
-                                # 매도 가능한 수량 계산
-                                available_quantity = notifier.asset_info[ticker]["free"] / (6 - stage)
+                        if current_stage == 0:
+                            print(f"{ticker}: 매도 신호 발생했으나 보유 수량 없음, 매도 스킵")
+                            continue
 
-                                # 소수점 및 최소 주문량 처리
-                                symbol_info = spot_symbol_info[ticker]
-                                step_size = symbol_info["stepSize"]
-                                min_qty = symbol_info["minQty"]
-                                available_quantity = math.floor(available_quantity / step_size) * step_size
-                                if available_quantity < min_qty:
-                                    print(f"{ticker} {stage}단계 매도 실패: 최소 주문량({min_qty}) 미만")
-                                    continue
-
-                                # 매도 진행
-                                print(f"{ticker} {stage}단계 매도 진행: 수량 {available_quantity}")
+                        if target_stage <= current_stage:
+                            quantity = ((spot_limit_amount.get(ticker, 0) * 0.2) * target_stage) / signal["current_price"]
+                            quantity = math.floor(quantity / step_size) * step_size
+                            if quantity >= min_qty:
+                                print(f"{ticker} {target_stage}단계 매도 진행: 수량 {quantity}")
                                 message = f"""
 매도 진행 신호 발생
 - 매도 비중: {signal["weight"]}
@@ -252,20 +246,34 @@ def main():
 - 1시간봉 트렌드 코드: {signal["trend_1h"]}
 """
                                 notifier.send_slack_message(config.slack_trade_channel_id, message)
-                                status = order.sell(symbol=f"{ticker}USDT", quantity=available_quantity)
+                                status = order.sell(symbol=f"{ticker}USDT", quantity=quantity)
                                 if status and status.get("status") == "FILLED":
-                                    print(f"{ticker} {stage}단계 매도 성공")
-                                    message = f"{ticker} {stage}단계 매도 성공"
-                                    notifier.send_slack_message(config.slack_trade_channel_id, message)
-                                    buy_sell_status[ticker]["sell_stage"] = stage
-                                else:
-                                    print(f"{ticker} {stage}단계 매도 실패: 주문 상태 미확인")
-                                    notifier.send_slack_message(
-                                        config.slack_error_channel_id,
-                                        f"{ticker} {stage}단계 매도 실패: 주문 상태 확인 필요"
-                                    )
+                                    buy_sell_status[ticker]["buy_stage"] -= target_stage  # ✅ 보유 단계 감소
+                                    buy_sell_status[ticker]["buy_stage"] = max(0, buy_sell_status[ticker]["buy_stage"])
+                            else:
+                                print(f"{ticker} 매도 실패: 최소 주문량 미만")
+
                         else:
-                            print("Hold")
+                            # ✅ 매도 stage가 현재 stage보다 높으면 전체 매도
+                            quantity = notifier.asset_info[ticker]["free"]
+                            quantity = math.floor(quantity / step_size) * step_size
+                            if quantity >= min_qty:
+                                print(f"{ticker} 전량 매도 진행: 수량 {quantity}")
+                                status = order.sell(symbol=f"{ticker}USDT", quantity=quantity)
+                                if status and status.get("status") == "FILLED":
+                                    buy_sell_status[ticker]["buy_stage"] = 0  # ✅ 보유 단계 초기화
+                                    message = f"{ticker} {stage}단계 매도 성공"
+                                    print(message)
+                                    notifier.send_slack_message(config.slack_trade_channel_id, message)
+                            else:
+                                message = f"{ticker} 전량 매도 실패: 최소 주문량 미만"
+                                print(message)
+                                notifier.send_slack_message(
+                                    config.slack_error_channel_id,
+                                    message
+                                )
+                    else:
+                        print("Hold")
                 except Exception as e:
                     print(f"현물 주문 중 오류: {e}")
 
