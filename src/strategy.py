@@ -1,8 +1,8 @@
-from data_control import Data_Control
-from config import Config
+from src.data_control import Data_Control
+from src.config import Config
 import numpy as np
 
-import utils
+import src.utils
 class Strategy:
     def __init__(self):
         pass
@@ -25,9 +25,9 @@ class Strategy:
         """
 
         try:
-            data_core = utils.data_source(data_dict)
+            data_core = src.utils.data_source(data_dict)
 
-            signal, weight, reason, stop_loss, take_profit = utils.trend_signal(data_core, future)
+            signal, weight, reason, stop_loss, take_profit = src.utils.trend_signal(data_core, future)
 
             # 결과 반환
             return {

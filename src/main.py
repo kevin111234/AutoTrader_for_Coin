@@ -1,13 +1,13 @@
 from binance.client import Client
 import time
-
-from config import Config
-from data_control import Data_Control
-from notifier import Notifier
-from strategy import Strategy
-from order_executor import Order
-import utils
 import math
+
+from src.config import Config
+from src.data_control import Data_Control
+from src.notifier import Notifier
+from src.strategy import Strategy
+from src.order_executor import Order
+import src.utils
 
 def main():
     print("투자 프로그램을 시작합니다.")
@@ -51,7 +51,7 @@ def main():
         initial_data[symbol] = {}
         vp_data[symbol] = {}
         tpo_data[symbol] = {}
-        spot_symbol_info[symbol] = utils.get_symbol_info(f"{symbol}USDT", client)
+        spot_symbol_info[symbol] = src.utils.get_symbol_info(f"{symbol}USDT", client)
 
         # 1분봉, 5분봉, 1시간봉 각각 300개의 데이터 조회
         for timeframe in ["1m", "5m", "1h"]:
@@ -81,7 +81,7 @@ def main():
                 futures_data[symbol] = {}
                 futures_vp_data[symbol] = {}
                 futures_tpo_data[symbol] = {}
-                future_symbol_info[symbol] = utils.get_symbol_info(f"{symbol}USDT", client)
+                future_symbol_info[symbol] = src.utils.get_symbol_info(f"{symbol}USDT", client)
                 for timeframe in ["1m", "5m", "1h"]:
                     future_data = data_control.data(client, symbol, timeframe, limit=300, futures=True)
                     # 각 데이터에 대한 기술적 지표 계산

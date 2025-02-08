@@ -1,4 +1,4 @@
-from config import Config
+from src.config import Config
 from binance.client import Client
 from slack_sdk import WebClient
 
