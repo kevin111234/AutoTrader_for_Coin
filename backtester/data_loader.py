@@ -101,6 +101,70 @@ def cal_indicator(data):
 
     return data
 
+def update_data(existing_df, client, symbol, timeframe, futures=False):
+    """
+    기존 데이터를 기반으로 마지막 캔들의 open_time 이후 5분 후의 캔들을 불러와 병합함.
+
+    매개변수:
+    existing_df : 기존 DataFrame (칼럼: "Open Time", "Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume")
+    client      : Binance API client 인스턴스
+    symbol      : 심볼 (예: "BTCUSDT")
+    timeframe   : 캔들 간격 (예: Client.KLINE_INTERVAL_5MINUTE 또는 "5m")
+    futures     : 선물 여부 (기본 False)
+
+    반환:
+    기존 데이터에 새 캔들을 병합한 DataFrame
+    """
+    symbol = f"{symbol}USDT"
+    # 마지막 캔들의 Open Time 가져오기
+    last_open_time = existing_df.iloc[-1]["Open Time"]
+    # 새로운 데이터 시작 시각: 마지막 open_time + 1분
+    new_start_dt = last_open_time + timedelta(minutes=1)
+    new_start_str = new_start_dt.strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 새 캔들 데이터 로딩 (캔들 하나만 요청)
+    if futures:
+        # futures_klines는 timestamp(ms) 사용
+        start_ts = int(new_start_dt.timestamp() * 1000)
+        candles = client.futures_klines(symbol=symbol, interval=timeframe, startTime=start_ts, limit=1)
+    else:
+        # 스팟은 시작 시간 문자열 사용 가능
+        candles = client.get_historical_klines(symbol, timeframe, new_start_str, limit=1)
+    
+    if not candles:
+        # 새 데이터 없으면 기존 데이터 그대로 반환
+        return existing_df
+    
+    # API 반환 항목: [Open Time, Open, High, Low, Close, Volume, Close Time, ...]
+    cols = ["Open Time", "Open", "High", "Low", "Close", "Volume",
+            "Close Time", "Quote Asset Volume", "Number of Trades",
+            "Taker Buy Base Asset Volume", "Taker Buy Quote Asset Volume", "Ignore"]
+    new_df = pd.DataFrame(candles, columns=cols)
+    
+    # 필요한 칼럼 선택 및 형변환
+    use_cols = ["Open Time", "Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume"]
+    new_df = new_df[use_cols].copy()
+    for col in ["Open", "High", "Low", "Close", "Volume", "Taker Buy Base Asset Volume"]:
+        new_df[col] = new_df[col].astype(float)
+    
+    # Taker Sell 거래량 계산
+    new_df["Taker Sell Base Asset Volume"] = new_df["Volume"] - new_df["Taker Buy Base Asset Volume"]
+    
+    # Open Time 컬럼을 datetime 형식으로 변환 (단, 스팟 API의 경우 ms 단위 아님)
+    # futures API는 ms 단위 반환하므로, 단위를 확인 후 변환 필요
+    try:
+        # 시도: ms 단위로 변환
+        new_df["Open Time"] = pd.to_datetime(new_df["Open Time"], unit="ms")
+    except Exception:
+        # 실패하면 문자열 그대로 datetime 변환
+        new_df["Open Time"] = pd.to_datetime(new_df["Open Time"])
+    
+    # 기존 데이터와 새 데이터를 병합
+    combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=["Open Time"], keep="last")
+    combined_df = combined_df.sort_values("Open Time").reset_index(drop=True)
+    
+    return combined_df
+
 if __name__ == "__main__":
     config = Config()
     api_key = config.binance_access_key
