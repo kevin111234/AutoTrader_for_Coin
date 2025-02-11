@@ -68,43 +68,44 @@ class BacktestEngine:
                     "type": trade_type, "price": current_price, "qty": buy_amount,
                     "weight": self.current_weight, "pnl": None
                 })
-                print(f"[{trade_type}] BUY {buy_amount:.6f} at {current_price:.2f} | 거래비중: {self.current_weight} | 보유량: {self.total_holdings:.6f} | 잔고: {self.balance:.2f}")
+                print(f"[{trade_type}] BUY {buy_amount:.6f} at ${current_price:.2f} | 거래비중: {self.current_weight} | 보유량: {self.total_holdings:.6f} | 잔고: ${self.balance:.2f}")
 
         elif signal == "sell" and self.entry_price is not None:
             if self.position == "long" and self.current_weight > 0:
-                sell_weight = min(self.current_weight, signal_weight)  # 매도 weight 결정
+                if current_price > self.entry_price*1.01 or trade_type != "TRADE":
+                    sell_weight = min(self.current_weight, signal_weight)  # 매도 weight 결정
 
-                # ✅ 현재 보유한 BTC 수량을 기준으로 매도량 계산
-                sell_amount = max(self.total_holdings * (sell_weight / self.current_weight), 0.00001)
+                    # ✅ 현재 보유한 BTC 수량을 기준으로 매도량 계산
+                    sell_amount = max(self.total_holdings * (sell_weight / self.current_weight), 0.00001)
 
-                # 매도 실행 전에 보유량 체크
-                if sell_amount > self.total_holdings:
-                    sell_amount = self.total_holdings  # 보유량 초과 방지
+                    # 매도 실행 전에 보유량 체크
+                    if sell_amount > self.total_holdings:
+                        sell_amount = self.total_holdings  # 보유량 초과 방지
 
-                # ✅ 총 보유량 업데이트
-                self.total_holdings -= sell_amount
+                    # ✅ 총 보유량 업데이트
+                    self.total_holdings -= sell_amount
 
-                # 매도 수행
-                profit = (current_price - self.entry_price) / self.entry_price
-                PnL = (current_price - self.entry_price) * sell_amount
-                self.balance += sell_amount * current_price * (1 - self.trading_fee)
-                self.current_weight -= sell_weight
+                    # 매도 수행
+                    profit = (current_price - self.entry_price) / self.entry_price * 100
+                    PnL = (current_price - self.entry_price) * sell_amount
+                    self.balance += sell_amount * current_price * (1 - self.trading_fee)
+                    self.current_weight -= sell_weight
 
-                # 포지션 정리 조건 수정
-                if self.current_weight == 0:
-                    self.position = None
-                    self.entry_price = None
-                    if self.total_holdings > 0:
-                        self.balance += self.total_holdings * current_price * (1 - self.trading_fee)
-                        self.total_holdings = 0
-                    else:
-                        self.total_holdings = 0  # ✅ 모든 포지션 정리 시 보유량 초기화
+                    # 포지션 정리 조건 수정
+                    if self.current_weight == 0:
+                        self.position = None
+                        self.entry_price = None
+                        if self.total_holdings > 0:
+                            self.balance += self.total_holdings * current_price * (1 - self.trading_fee)
+                            self.total_holdings = 0
+                        else:
+                            self.total_holdings = 0  # ✅ 모든 포지션 정리 시 보유량 초기화
 
-                self.trade_history.append({
-                    "type": trade_type, "price": current_price, "qty": sell_amount,
-                    "weight": self.current_weight, "pnl": profit
-                })
-                print(f"[{trade_type}] SELL {sell_amount:.6f} at {current_price:.2f} | 수익률: {profit:.2f} | 수익액: {PnL:.2f} | 거래비중: {self.current_weight} | 보유수량: {self.total_holdings:.6f} | 잔고: {self.balance:.2f}")
+                    self.trade_history.append({
+                        "type": trade_type, "price": current_price, "qty": sell_amount,
+                        "weight": self.current_weight, "pnl": profit
+                    })
+                    print(f"[{trade_type}] SELL {sell_amount:.6f} at ${current_price:.2f} | 수익률: {profit:.2f}% | 수익액: ${PnL:.2f} | 거래비중: {self.current_weight} | 보유수량: {self.total_holdings:.6f} | 잔고: ${self.balance:.2f}")
 
     def get_trade_history(self):
         df = pd.DataFrame(self.trade_history)
