@@ -79,13 +79,28 @@ if __name__ == "__main__":
     api_secret = config.binance_secret_key
     client = Client(api_key, api_secret)
 
-    symbol = "BTC"
+    ticker_list = config.coin_tickers.split(" ")
+    future_use = bool(config.futures_use)
+    if future_use:
+        future_ticker_list = config.futures_coin_tickers.split(" ")
+
     start_date = "2023-01-01 00:00:00"
     data_dict = {}
+    future_data_dict = {}
 
-    for timeframe in ["1m", "5m", "1h"]:
-        data = load_backtest_data(client, symbol, timeframe, start_date, limit=300, futures=False)
-        data_dict[timeframe] = cal_indicator(data)
+    for symbol in ticker_list:
+        data_dict[symbol] = {}
+        for timeframe in ["1m", "5m", "1h"]:
+            data = load_backtest_data(client, symbol, timeframe, start_date, limit=300, futures=False)
+            data_dict[symbol][timeframe] = cal_indicator(data)
+
+    if future_use:
+        for symbol in future_ticker_list:
+            future_data_dict[symbol] = {}
+            for timeframe in ["1m", "5m", "1h"]:
+                data = load_backtest_data(client, symbol, timeframe, start_date, limit=300, futures=False)
+                future_data_dict[symbol][timeframe] = cal_indicator(data)
 
     print("데이터 로딩 완료:")
     print(data_dict)
+    print(future_data_dict)
