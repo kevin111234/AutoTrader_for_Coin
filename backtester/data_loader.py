@@ -77,7 +77,7 @@ def load_backtest_data(client, symbol, timeframe, end_date, limit=300, futures=F
     
     # Open Time을 datetime으로 변환 후 정렬
     df["Open Time"] = pd.to_datetime(df["Open Time"], unit='ms')
-    df = df.sort_values("Open Time").reset_index(drop=True)
+    df = df.drop_duplicates(subset=["Open Time"]).sort_values("Open Time").reset_index(drop=True)
     
     # 혹시 데이터가 limit보다 많다면 마지막 limit개만 취함
     if len(df) > limit:
@@ -118,8 +118,8 @@ def update_data(existing_df, client, symbol, timeframe, futures=False):
     symbol = f"{symbol}USDT"
     # 마지막 캔들의 Open Time 가져오기
     last_open_time = existing_df.iloc[-1]["Open Time"]
-    # 새로운 데이터 시작 시각: 마지막 open_time + 1분
-    new_start_dt = last_open_time + timedelta(minutes=1)
+    # 새로운 데이터 시작 시각: 마지막 open_time + 5분
+    new_start_dt = last_open_time + timedelta(minutes=5)
     new_start_str = new_start_dt.strftime("%Y-%m-%d %H:%M:%S")
     
     # 새 캔들 데이터 로딩 (캔들 하나만 요청)
@@ -161,7 +161,7 @@ def update_data(existing_df, client, symbol, timeframe, futures=False):
     
     # 기존 데이터와 새 데이터를 병합
     combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=["Open Time"], keep="last")
-    combined_df = combined_df.sort_values("Open Time").reset_index(drop=True)
+    combined_df = combined_df.drop_duplicates(subset=["Open Time"]).sort_values("Open Time").reset_index(drop=True)
     
     return combined_df
 
