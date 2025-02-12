@@ -175,7 +175,7 @@ class RLTradingLiveEnv(gym.Env):
         obs = self._get_observation() if not done else np.zeros(self.observation_space.shape, dtype=np.float32)
         info = {"current_time": self.current_time, "balance": self.engine.balance}
 
-        print(f"지급보상: {reward} 현재가격: {current_price}")
+        # print(f"지급보상: {reward} 현재가격: {current_price}")
         return obs, reward, done, info
     
     def reset(self):
