@@ -58,11 +58,13 @@ class BacktestEngine:
                 self.current_weight = signal_weight
                 self.position = "long"
 
-                # 진입 가격 업데이트
+                # 진입각격 업데이트
                 if self.entry_price is not None:
-                    self.entry_price = (current_price + self.entry_price) / 2
+                    total_quantity = self.total_holdings + buy_amount
+                    self.entry_price = (self.entry_price * self.total_holdings + current_price * buy_amount) / total_quantity
                 else:
                     self.entry_price = current_price
+
 
                 self.trade_history.append({
                     "type": trade_type, "price": current_price, "qty": buy_amount,
@@ -71,7 +73,7 @@ class BacktestEngine:
                 print(f"[{trade_type}] BUY {buy_amount:.6f} at ${current_price:.2f} | 거래비중: {self.current_weight} | 보유량: {self.total_holdings:.6f} | 잔고: ${self.balance:.2f}")
 
         elif signal == "sell" and self.entry_price is not None:
-            if self.position == "long" and self.current_weight > 0:
+            if self.position == "long" and self.current_weight > 0 and signal_weight > 0:
                 if current_price > self.entry_price*1.01 or trade_type != "TRADE":
                     sell_weight = min(self.current_weight, signal_weight)  # 매도 weight 결정
 
@@ -105,7 +107,7 @@ class BacktestEngine:
                         "type": trade_type, "price": current_price, "qty": sell_amount,
                         "weight": self.current_weight, "pnl": profit
                     })
-                    print(f"[{trade_type}] SELL {sell_amount:.6f} at ${current_price:.2f} | 수익률: {profit:.2f}% | 수익액: ${PnL:.2f} | 거래비중: {self.current_weight} | 보유수량: {self.total_holdings:.6f} | 잔고: ${self.balance:.2f}")
+                    print(f"[{trade_type}] SELL {sell_amount:.6f} at ${current_price:.2f} | 수익률: {profit:.2f}% | 수익액: ${PnL:.2f} | 거래비중: {signal_weight} | 보유수량: {self.total_holdings:.6f} | 잔고: ${self.balance:.2f}")
 
     def get_trade_history(self):
         df = pd.DataFrame(self.trade_history)

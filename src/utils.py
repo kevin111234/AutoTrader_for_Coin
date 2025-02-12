@@ -17,7 +17,7 @@ def get_trend_info(df):
 
     # i를 뒤에서부터 탐색해 현재 추세와 다른 값이 나오는 순간이 "이전 추세"의 시작점
     i = len(df) - 2
-    while i >= 0 and (df["trend"].iloc[i] == current_trend or df["trend"].iloc[i] == 10 or df["trend"].iloc[i] == 0):
+    while i >= 0 and (df["trend"].iloc[i] == current_trend or df["trend"].iloc[i] == 0):
         i -= 1
 
     if i < 0:
@@ -36,7 +36,7 @@ def get_trend_info(df):
         # ---------------------------
         # j를 i-1부터 거슬러 올라가, previous_trend와 다른 값이 나오는 순간이 T-2
         j = i - 1
-        while j >= 0 and (df["trend"].iloc[j] == previous_trend or df["trend"].iloc[i] == 10 or df["trend"].iloc[i] == 0):
+        while j >= 0 and (df["trend"].iloc[j] == previous_trend or df["trend"].iloc[i] == 0):
             j -= 1
 
         if j < 0:
