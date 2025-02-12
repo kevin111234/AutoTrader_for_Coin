@@ -4,7 +4,7 @@ from decimal import Decimal, ROUND_DOWN
 
 
 class BacktestEngine:
-    def __init__(self, initial_balance=1000, trading_fee=0.0):
+    def __init__(self, initial_balance=1000, trading_fee=0.003):
         self.initial_balance = initial_balance  # 초기 자본
         self.total_capital = initial_balance  # 전체 자산 (기준값)
         self.balance = initial_balance  # 현재 잔고 (매매 후 변경)
