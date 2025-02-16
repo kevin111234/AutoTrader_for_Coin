@@ -28,9 +28,6 @@ def rsi_stratage(data_core):
     elif rsi > 65:
         signal = "sell"
         weight = 2
-    elif rsi > 60:
-        signal = "sell"
-        weight = 1
 
     elif rsi < 20:
         signal = "buy"
@@ -44,9 +41,6 @@ def rsi_stratage(data_core):
     elif rsi < 35:
         signal = "buy"
         weight = 2
-    elif rsi < 40:
-        signal = "buy"
-        weight = 1
 
     return {
     "current_price": data_core["last_5m"]["Close"],
