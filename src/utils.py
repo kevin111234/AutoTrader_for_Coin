@@ -344,6 +344,131 @@ def trend_signal(data_core, future):
 
 def signal_maker_1(data_core, future):
 
+    # 신호 및 기본값 초기화
+    current_price = data_core["last_1m"]["Close"]
+    trend_5m = data_core.get("current_trend_5m", 0)
+
+    GC_20_60 = trend_5m in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_trend_5m"] in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_5m"] < 5
+    GC_60_120 =  trend_5m in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_trend_5m"] in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_5m"] < 5
+    GC_rsi = data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] < data_core["previous_5m"]["rsi_signal"]
+
+    DC_20_60 = trend_5m in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_5m"] < 5
+    DC_60_120 =  trend_5m in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_5m"] < 5
+    DC_rsi = data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] > data_core["previous_5m"]["rsi_signal"]
+
+    signal = "hold"
+    weight = 0
+    reason = []
+    stop_loss = current_price * 0.95
+    take_profit = current_price * 1.05
+
+    # sma120 < sma60 < sma20
+    if trend_5m in [1, 2, 3]:
+        if data_core["volume_ratio"] > 1:
+            weight += 1
+        if data_core["buy_volume_ratio"] > 0.6:
+            weight += 1
+        if GC_rsi and data_core["last_5m"]["rsi"] < 70:
+            weight += 2
+        if data_core["last_5m"]["percent_b"] > 0.4:
+            weight += 1
+        
+        if weight > 0:
+            if future:
+                signal = "L_buy"
+            else:
+                signal = "buy"
+        
+        # 손절조건
+        if data_core["last_5m"]["rsi"] < 50 and data_core["volume_ratio"] < 0.8 and data_core["last_5m"]["obv_slope_from_min"] > 0:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+        
+        # 익절조건
+        if data_core["last_5m"]["rsi"] > 70 and data_core["last_5m"]["rsi"] + 1 < data_core["previous_5m"]["rsi"]:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+    
+    # sma120 < sma20 < sma60
+    elif trend_5m in [7, 8, 9]:
+        if data_core["last_5m"]["obv_slope_from_min"] < 0:
+            weight += 1
+        if data_core["volume_ratio"] > 1.0 and data_core["buy_volume_ratio"] > 0.6:
+            weight += 1
+        if GC_rsi and 60 > data_core["last_5m"]["rsi"] > 50:
+            weight += 2
+        
+        if weight > 0:
+            if future:
+                signal = "L_buy"
+            else:
+                signal = "buy"
+
+        # 손절조건
+        if data_core["last_5m"]["percent_b"] < 0.4 and data_core["last_5m"]["rsi"] < 50:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+
+        # 익절조건
+        if data_core["volume_ratio"] < 0.8 and data_core["last_5m"]["rsi"] > 70:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+            weight = 5
+
+    # sma20 < sma120 < sma60
+    # 일단 패스
+
+    # sma20 < sma60 < sma120
+    elif trend_5m in [-7, -8,-9]:
+        if DC_rsi and data_core["last_5m"]["rsi"] >30:
+            weight += 1
+        if data_core["volume_ratio"] > 0.8 and data_core["buy_volume_ratio"] < 0.4:
+            weight += 2
+        if data_core["last_5m"]["percent_b"] < 0.4:
+            weight += 1
+
+        if weight > 0:
+            if future:
+                signal = "S_buy"
+            else:
+                signal = "sell"
+
+        # 숏 손절조건
+        if GC_20_60 and data_core["buy_volume_ratio"] > 0.6 and data_core["volume_ratio"] > 0.8:
+            if future:
+                signal = "L_buy"
+                weight = 2
+            else:
+                signal = "buy"
+                weight = 2
+        
+        # 숏 익절조건
+        if data_core["last_5m"]["rsi"] < 25:
+            if future:
+                signal = "S_sell"
+                weight = 5
+
+    """
+    trend 변화
+    sma120 < sma60 < sma20    # 1, 2, 3
+    sma120 < sma20 < sma60    # 7, 8, 9
+    sma20 < sma120 < sma60    # -1, -2, -3
+    sma20 < sma60 < sma120    # -7, -8, -9
+    sma60 < sma20 < sma120    # -4, -5, -6
+    sma60 < sma120 < sma20    # 4, 5, 6
+    """
+
     # 이동평균선 전략
     """
         **매수 조건**  
@@ -461,3 +586,177 @@ def signal_maker_1(data_core, future):
         - 최근 5개봉 OBV 최소값 대비 기울기는 크게 변화하지 않거나 완만한 하락세를 보일 경우, 이미 바닥을 찍은 상태로 판단  
         - 근거: 최소값 대비 기울기가 크게 변화하지 않으면, 하락 모멘텀이 지속될 가능성이 크므로 매도 신호 강화
     """
+
+    return signal, weight, reason, stop_loss, take_profit
+
+def signal_maker_2(data_core, future):
+
+    # 신호 및 기본값 초기화
+    current_price = data_core["last_1m"]["Close"]
+    trend_5m = data_core.get("current_trend_5m", 0)
+
+    GC_20_60 = trend_5m in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_trend_5m"] in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_5m"] < 5
+    GC_60_120 =  trend_5m in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_trend_5m"] in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_5m"] < 5
+    GC_rsi = data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] < data_core["previous_5m"]["rsi_signal"]
+
+    DC_20_60 = trend_5m in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_5m"] < 5
+    DC_60_120 =  trend_5m in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_5m"] < 5
+    DC_rsi = data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] > data_core["previous_5m"]["rsi_signal"]
+
+    # rsi 정규화
+    rsi = data_core["last_5m"]["rsi"]
+    previous_rsi = data_core["previous_5m"]["rsi"]
+
+    signal = "hold"
+    weight = 0
+    reason = []
+    stop_loss = 0.95
+    take_profit = 1.05
+
+    # 이동평균선 활용 전략
+    if trend_5m in [1, 2, 3]:
+    # 진입조건
+        # 가격이 20일 이동평균선 지지 (0.4 < %b)
+        if data_core["last_5m"]["percent_b"] >0.4 and data_core["last_5m"]["SMA_20"] * 1.01 > current_price:
+            weight += 1
+
+        # volume_ratio > 1.0
+        if data_core["volume_ratio"] > 1.0:
+            weight += 1
+
+        # buy_volume_ratio > 0.6
+        if data_core["buy_volume_ratio"] > 0.6:
+            weight += 1
+
+        # 골든크로스
+        if GC_20_60:
+            weight += 1
+            if GC_60_120:
+                weight += 1
+
+        # rsi 골든크로스
+        if GC_rsi:
+            weight += 2
+
+        # rsi > rsi_signal
+        if data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"]:
+            weight += 1
+
+        # obv_slope_from_max < 0
+        if data_core["last_5m"]["obv_slope_from_max"] < 0:
+            weight += 2
+
+        weight = weight // 2 # weight 총합이 10이므로 2로 나눈 몫을 활용
+        if weight > 0:
+            if future:
+                signal = "L_buy"
+            else:
+                signal = "buy"
+            
+            stop_loss = 0.97
+            take_profit = 1.1
+
+    # 손절조건
+        # 가격이 20일 이동평균선 하향돌파 (%b < 0.4)
+        if data_core["last_5m"]["percent_b"] < 0.4:
+            if future:
+                signal = "L_sell"
+            else:
+                signal = "sell"
+
+            weight = 5
+
+    elif trend_5m in [-7, -8, -9]:
+    # 진입조건
+        # 가격이 20일 이동평균선 저항 (%b < 0.6)
+        if data_core["last_5m"]["percent_b"] < 0.6:
+            weight += 1
+
+        # volume_ratio > 1.0
+        if data_core["volume_ratio"] > 1.0:
+            weight += 1
+
+        # buy_volume_ratio < 0.4
+        if data_core["buy_volume_ratio"] < 0.4:
+            weight += 1
+
+        # 데드크로스
+        if DC_20_60:
+            weight += 1
+            if DC_60_120:
+                weight += 1
+
+        # rsi 데드크로스
+        if DC_rsi:
+            weight += 2
+
+        # rsi < rsi_signal
+        if data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"]:
+            weight += 1
+
+        # obv_slope_from_min > 0
+        if data_core["last_5m"]["obv_slope_from_min"] > 0:
+            weight += 2
+
+        weight = weight // 2
+        if weight > 0:
+            if future:
+                signal = "S_buy"
+
+                stop_loss = 1.05
+                take_profit = 0.9
+            else:
+                signal = "sell"
+
+    # 손절조건
+        # 가격이 20일 이동평균선 상향돌파 (0.6 < %b)
+        if data_core["last_5m"]["percent_b"] > 0.6:
+            if future:
+                signal = "S_sell"
+                weight = 5
+
+    else:
+    # 볼린저밴드를 활용한 박스권 매매
+    # 밴드폭이 급격히 줄어드는 스퀴즈 구간 주의
+        # 롱 포지션
+        if data_core["last_5m"]["percent_b"] < 0.1:
+            weight += 1
+        if 0.7 < data_core["volume_ratio"] < 1.0:
+            weight -= 1
+        if data_core["buy_volume_ratio"] > 0.5:
+            weight += 1
+        if data_core["last_5m"]["rsi"] < 30:
+            weight += 2
+        elif data_core["last_5m"]["rsi"] < 45:
+            weight += 1
+        
+        # 숏 포지션
+        if data_core["last_5m"]["percent_b"] > 0.9:
+            weight -= 1
+        if 0.7 < data_core["volume_ratio"] < 1.0:
+            weight -= 1
+        if data_core["buy_volume_ratio"] < 0.5:
+            weight -= 1
+        if data_core["last_5m"]["rsi"] > 70:
+            weight -= 2
+        elif data_core["last_5m"]["rsi"] > 55:
+            weight -= 1
+
+        if weight > 0:
+            if future:
+                signal = "L_buy"
+            else:
+                signal = "buy"
+        
+        elif weight < 0:
+            weight *= -1
+            if future:
+                signal = "S_buy"
+            else:
+                signal = "sell"
+
+        if data_core["last_5m"]["RBW"] < 0.8:
+            weight = 0
+            signal = "hold"
+
+    return signal, weight, reason, stop_loss, take_profit

@@ -27,7 +27,7 @@ class Strategy:
         try:
             data_core = src.utils.data_source(data_dict)
 
-            signal, weight, reason, stop_loss, take_profit = src.utils.trend_signal(data_core, future)
+            signal, weight, reason, stop_loss, take_profit = src.utils.signal_maker_2(data_core, future)
 
             # 결과 반환
             return {
