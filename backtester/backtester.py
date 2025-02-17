@@ -10,13 +10,15 @@ from datetime import datetime
 
 from src.config import Config
 from src.data_control import Data_Control
-from src.utils import data_source
+from src.utils import data_source, signal_maker_1
+from src.strategy import Strategy
 from backtester.test_strategy import rsi_stratage
 from backtester.backtest_engine import BacktestEngine
 from backtester.data_loader import load_backtest_data, cal_indicator, update_data
 
 def backtester(start_date, end_date):
     config = Config()
+    strategy = Strategy()
     api_key = config.binance_access_key
     api_secret = config.binance_secret_key
     client = Client(api_key, api_secret)
@@ -56,15 +58,16 @@ def backtester(start_date, end_date):
             data_dict[symbol]["1h"] = cal_indicator(updated_data_1h)
 
         # 데이터 정제
-        data_core = data_source(data_dict[symbol])
-        signal_info = rsi_stratage(data_core)
+        signal_info = strategy.signal(data_dict[symbol], False)
 
         engine.execute_trade(signal_info["signal"], signal_info)
 
         # print(f"현재 시간: {current_time} | 잔고: {engine.balance:.2f}")
 
-    print("백테스트 종료. 최종 잔고:", engine.balance)
+    profit_ratio = ((engine.balance - engine.initial_balance) / engine.initial_balance) * 100
+    print("백테스트 종료. 최종 잔고:", engine.balance, " 수익률:", profit_ratio, "%")
+    print("최대 손실율 (MDD): {:.2f}%".format(engine.get_mdd()))
     print(engine.get_trade_history())  
 
 if __name__ == "__main__":
-    backtester("2023-01-01 00:00:00", "2023-02-01 00:00:00")
+    backtester("2024-01-01 00:00:00", "2025-02-01 00:00:00")
