@@ -8,12 +8,27 @@ class BacktestEngine:
         self.initial_balance = initial_balance  # 초기 자본
         self.total_capital = initial_balance  # 전체 자산 (기준값)
         self.balance = initial_balance  # 현재 잔고 (매매 후 변경)
+        self.peak_balance = initial_balance  # ✅ 최고 자산 값 (MDD 계산용)
+        self.max_drawdown = 0  # ✅ MDD 기록
+
         self.position = None  # 현재 포지션 (None, "long", "short")
         self.entry_price = None  # 진입 가격
         self.current_weight = 0  # 현재 보유 weight (0~5)
         self.trade_history = []  # 거래 내역 저장
         self.trading_fee = trading_fee  # 거래 수수료
         self.total_holdings = 0  # 현재 보유한 BTC 수량
+
+    def get_total_value(self, current_price):
+        """현재 모든 자산을 매도할 경우의 총 자산 반환"""
+        estimated_value = self.balance + (self.total_holdings * current_price * (1 - self.trading_fee))
+        return estimated_value
+
+    def update_mdd(self, current_price):
+        """MDD 업데이트 (현재 모든 보유 자산을 매도한 경우의 평가 자산 기준)"""
+        total_value = self.get_total_value(current_price)
+        self.peak_balance = max(self.peak_balance, total_value)
+        drawdown = (self.peak_balance - total_value) / self.peak_balance
+        self.max_drawdown = max(self.max_drawdown, drawdown)
 
     def execute_trade(self, signal, signal_info, trade_type="TRADE"):
         current_price = signal_info["current_price"]
@@ -27,16 +42,16 @@ class BacktestEngine:
             self.total_capital = self.balance  # 초기 잔고를 전체 자산으로 설정
 
         # ✅ 손절 및 익절 체크 (중복 실행 제거)
-        if self.position == "long":
-            if current_price <= self.entry_price * stop_loss:
-                signal = "sell"
-                trade_type = "STOP_LOSS"
-                signal_weight = 5  # 최대 가중치로 전량 매도
-
-            elif current_price >= self.entry_price * take_profit:
-                signal = "sell"
-                trade_type = "TAKE_PROFIT"
-                signal_weight = 5  # 최대 가중치로 전량 매도
+        # if self.position == "long":
+        #     if current_price <= self.entry_price * stop_loss:
+        #         signal = "sell"
+        #         trade_type = "STOP_LOSS"
+        #         signal_weight = 5  # 최대 가중치로 전량 매도
+        # 
+        #     elif current_price >= self.entry_price * take_profit:
+        #         signal = "sell"
+        #         trade_type = "TAKE_PROFIT"
+        #         signal_weight = 5  # 최대 가중치로 전량 매도
 
         # ✅ 매매 로직 수행 (손절/익절 반영)
         if signal == "buy":
@@ -108,6 +123,8 @@ class BacktestEngine:
                         "weight": self.current_weight, "pnl": profit
                     })
                     print(f"[{trade_type}] SELL {sell_amount:.6f} at ${current_price:.2f} | 수익률: {profit:.2f}% | 수익액: ${PnL:.2f} | 거래비중: {signal_weight} | 보유수량: {self.total_holdings:.6f} | 잔고: ${self.balance:.2f}")
+        # ✅ MDD 업데이트
+        self.update_mdd(current_price)
 
     def get_trade_history(self):
         df = pd.DataFrame(self.trade_history)
