@@ -46,7 +46,7 @@ API 설정에 대한 정보는 [[https://woghd-dev.tistory.com/19](https://woghd
 | **Spread_20_60_MA**              | Spread_20_60의 이동평균                                    | float64        |
 | **Spread_60_120_MA**             | Spread_60_120의 이동평균                                   | float64        |
 | **Spread_20_120_MA**             | Spread_20_120의 이동평균                                   | float64        |
-| **Trend**                        | 추세 상태 (7단계: -3 ~ 3)                                  | int            |
+| **Trend**                        | 추세 상태 (19단계: -9 ~ 9)                                  | int            |
 
 - **단위:** `Open Time`은 밀리초(ms) 단위로 제공되며, 데이터프레임에서 `pd.to_datetime()`을 통해 datetime 형식으로 변환됩니다.  
 
@@ -69,7 +69,7 @@ API 설정에 대한 정보는 [[https://woghd-dev.tistory.com/19](https://woghd
 - **코드 -7**: `sma20 < sma60 < sma120` & `RBW >= 1.1`
 - **코드 -8**: `sma20 < sma60 < sma120` & `0.8 <= RBW < 1.1`
 - **코드 -9**: `sma20 < sma60 < sma120` & `RBW < 0.8`
-- **코드 0/10**: (기타, or `sma120 ≈ sma60 ≈ sma20` 등 애매 구간)
+- **코드 0**: (기타, or `sma120 ≈ sma60 ≈ sma20` 등 애매 구간)
 
 ---
   
