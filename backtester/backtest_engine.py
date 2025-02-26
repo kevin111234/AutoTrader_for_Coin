@@ -16,7 +16,6 @@ class BacktestEngine:
         self.trading_fee = trading_fee  
         self.total_holdings = 0  
         self.last_stop_loss_trend = None
-        self.cooling_timer = 0
         
         # 거래 진입 시 설정한 손절/익절 값을 저장하는 변수 추가
         self.entry_stop_loss = None
@@ -58,7 +57,6 @@ class BacktestEngine:
                 trade_type = "STOP_LOSS"
                 signal_weight = 5  
                 self.last_stop_loss_trend = signal_info.get("current_trend_5m", None)
-                self.cooling_timer = 12
             elif current_price >= self.entry_price * take_profit:
                 signal = "sell"
                 trade_type = "TAKE_PROFIT"

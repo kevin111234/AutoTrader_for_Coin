@@ -56,13 +56,6 @@ def backtester(start_date, end_date):
 
         # 데이터 정제
         signal_info = strategy.signal(data_dict[symbol], False)
-
-        if engine.last_stop_loss_trend in [4, 5, 6, 7, 8, 9, 0, -1, -2, -3, -4, -5, -6] and signal_info["trend_5m"] in [4, 5, 6, 7, 8, 9, 0, -1, -2, -3, -4, -5, -6] and engine.cooling_timer > 0:
-            signal_info["signal"] = "hold"
-            signal_info["weight"] = 0
-            signal_info["reason"] = "쿨링 기간"
-            engine.cooling_timer -= 1
-
         engine.execute_trade(signal_info["signal"], signal_info)
 
         # ✅ 1시간마다 현재 상태 출력
