@@ -180,91 +180,6 @@ class Data_Control():
 
         return df
 
-    def cal_tpo_volume_profile(self, data, 
-                              price_col='Close', 
-                              volume_col='Volume', 
-                              taker_buy_col='Taker Buy Base Asset Volume', 
-                              taker_sell_col='Taker Sell Base Asset Volume', 
-                              bins=20):
-        """
-        TPO(Time at Price)와 볼륨 프로파일(VP)을 함께 계산하는 함수.
-        또한 Taker Buy / Sell 거래량을 구간별로 집계할 수 있습니다.
-        
-        :param data: 가격, 거래량 및 Taker Buy/Sell 칼럼을 포함한 Pandas DataFrame
-        :param price_col: 가격 컬럼명(기본값: 'Close')
-        :param volume_col: 전체 거래량 컬럼명(기본값: 'Volume')
-        :param taker_buy_col: Taker 매수 거래량 컬럼명(기본값: 'Taker Buy Base Asset Volume')
-        :param taker_sell_col: Taker 매도 거래량 컬럼명(기본값: 'Taker Sell Base Asset Volume')
-        :param bins: 가격 구간(bin) 수 (기본값: 20)
-        :return: 
-            profile_df: 각 가격 구간별 VP, TPO, Taker Buy/Sell Volume 정보를 담은 DataFrame
-            sr_levels: POC 및 상위 레벨 정보를 담은 dictionary
-        """
-
-        prices = data[price_col]
-        volumes = data[volume_col]
-
-        # Taker 매수/매도 거래량 시리즈
-        taker_buy_volumes = data[taker_buy_col]
-        taker_sell_volumes = data[taker_sell_col]
-
-        # 가격 범위 설정
-        price_min, price_max = prices.min(), prices.max()
-        bin_edges = np.linspace(price_min, price_max, bins + 1)
-
-        # 각 가격이 속하는 구간 식별
-        bin_indices = np.digitize(prices, bin_edges)  # 결과는 1 ~ bins+1 범위
-
-        # 볼륨 프로파일: 구간별 거래량 합계
-        volume_profile = pd.Series(0.0, index=range(1, bins + 1))
-        # TPO 프로파일: 구간별 등장 횟수(= 시장이 해당 가격대 근처에 머문 횟수)
-        tpo_profile = pd.Series(0, index=range(1, bins + 1))
-        # Taker Buy/Sell 구간별 거래량
-        taker_buy_profile = pd.Series(0.0, index=range(1, bins + 1))
-        taker_sell_profile = pd.Series(0.0, index=range(1, bins + 1))
-
-        # 각 행에 대해 해당 구간에 거래량 및 TPO 할당
-        for idx, vol, tb_vol, ts_vol in zip(bin_indices, volumes, taker_buy_volumes, taker_sell_volumes):
-            if 1 <= idx <= bins:
-                volume_profile[idx] += vol
-                tpo_profile[idx] += 1
-                taker_buy_profile[idx] += tb_vol
-                taker_sell_profile[idx] += ts_vol
-
-        # 결과 DataFrame 생성
-        profile_df = pd.DataFrame({
-            'Bin': range(1, bins + 1),
-            'Price_Low': bin_edges[:-1],
-            'Price_High': bin_edges[1:],
-            'Volume': volume_profile.values,
-            'TPO': tpo_profile.values,
-            'Taker_Buy_Volume': taker_buy_profile.values,
-            'Taker_Sell_Volume': taker_sell_profile.values
-        })
-
-        # 거래량과 TPO 모두 상위권인 구간 식별 (간단한 가중합 방식)
-        profile_df['Volume_norm'] = profile_df['Volume'] / profile_df['Volume'].sum() if profile_df['Volume'].sum() != 0 else 0
-        profile_df['TPO_norm'] = profile_df['TPO'] / profile_df['TPO'].sum() if profile_df['TPO'].sum() != 0 else 0
-        profile_df['Score'] = profile_df['Volume_norm'] + profile_df['TPO_norm']
-
-        # Score 기준 내림차순 정렬
-        sorted_df = profile_df.sort_values('Score', ascending=False).reset_index(drop=True)
-        
-        # 상위 3개를 잠재적 지지/저항 구간으로 추출 (예시)
-        top_zones = sorted_df.head(3)
-
-        # 가장 높은 Score를 가진 구간을 POC(Point of Control)로 간주
-        poc = top_zones.iloc[0].to_dict()
-        other_zones = top_zones.iloc[1:].to_dict('records')
-
-        # 지지/저항선 정보 dictionary
-        sr_levels = {
-            'POC': poc,
-            'Levels': other_zones
-        }
-
-        return profile_df, sr_levels
-
     def cal_obv(self, df, price_col='Close', volume_col='Volume',
                 obv_col='obv', period_1=5, period_2 = 60):
         """
@@ -883,3 +798,13 @@ class Data_Control():
         except Exception as e:
             print(f"데이터 업데이트 중 오류 발생: {e}")
             return existing_data
+        
+    def cal_indicator(self, data):
+        data = self.cal_moving_average(data)
+        data = self.cal_rsi(data)
+        data = self.cal_bollinger_band(data)
+        data = self.cal_obv(data)
+        data = self.LT_trand_check(data)
+        data = self.cal_atr(data)
+        data = self.cal_macd(data)
+        data = self.cal_adx(data)
