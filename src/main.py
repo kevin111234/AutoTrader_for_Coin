@@ -1,6 +1,12 @@
 from binance.client import Client
 import time
 import math
+import sys
+import os
+
+# 프로젝트 루트 디렉토리의 절대 경로를 구함
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
 from src.config import Config
 from src.data_control import Data_Control
@@ -62,6 +68,9 @@ def main():
             data = data_control.cal_bollinger_band(data)
             data = data_control.cal_obv(data)
             data = data_control.LT_trand_check(data)
+            data = data_control.cal_atr(data)
+            data = data_control.cal_macd(data)
+            data = data_control.cal_adx(data)
 
             # 비어있는 값 제거
             data = data.dropna()
@@ -90,6 +99,9 @@ def main():
                     future_data = data_control.cal_bollinger_band(future_data)
                     future_data = data_control.cal_obv(future_data)
                     future_data = data_control.LT_trand_check(future_data)
+                    future_data = data_control.cal_atr(future_data)
+                    future_data = data_control.cal_macd(future_data)
+                    future_data = data_control.cal_adx(future_data)
 
                     # 비어있는 값 제거
                     future_data = future_data.dropna()
@@ -155,6 +167,9 @@ def main():
                     updated_data = data_control.cal_bollinger_band(updated_data)
                     updated_data = data_control.cal_obv(updated_data)
                     updated_data = data_control.LT_trand_check(updated_data)
+                    updated_data = data_control.cal_atr(updated_data)
+                    updated_data = data_control.cal_macd(updated_data)
+                    updated_data = data_control.cal_adx(updated_data)
 
                     # TPO/VP 데이터 업데이트
                     initial_data[ticker][timeframe] = updated_data
@@ -294,6 +309,9 @@ def main():
                         updated_data = data_control.cal_bollinger_band(updated_data)
                         updated_data = data_control.cal_obv(updated_data)
                         updated_data = data_control.LT_trand_check(updated_data)
+                        updated_data = data_control.cal_atr(updated_data)
+                        updated_data = data_control.cal_macd(updated_data)
+                        updated_data = data_control.cal_adx(updated_data)
 
                         # TPO/VP 데이터 업데이트
                         futures_data[ticker][timeframe] = updated_data

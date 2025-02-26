@@ -93,6 +93,9 @@ def cal_indicator(data):
     data = data_control.cal_bollinger_band(data)
     data = data_control.cal_obv(data)
     data = data_control.LT_trand_check(data)
+    data = data_control.cal_atr(data)
+    data = data_control.cal_macd(data)
+    data = data_control.cal_adx(data)
 
     data = data.dropna()
 
@@ -197,3 +200,9 @@ if __name__ == "__main__":
     print("데이터 로딩 완료:")
     print(data_dict)
     print(future_data_dict)
+
+    for coin, timeframes in data_dict.items():
+        for tf, df in timeframes.items():
+            csv_filename = f"{coin}_{tf}.csv"
+            df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
+            print(f"{csv_filename} 파일로 저장 완료.")
