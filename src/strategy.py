@@ -1,3 +1,10 @@
+import sys
+import os
+
+# 프로젝트 루트 디렉토리의 절대 경로를 구함
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
 from src.data_control import Data_Control
 from src.config import Config
 import numpy as np
@@ -27,7 +34,7 @@ class Strategy:
         try:
             data_core = src.utils.data_source(data_dict)
 
-            signal, weight, reason, stop_loss, take_profit = src.utils.signal_maker_2(data_core, future)
+            signal, weight, reason, stop_loss, take_profit = src.utils.signal_maker_5(data_core, future)
 
             # 결과 반환
             return {

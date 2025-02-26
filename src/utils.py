@@ -346,246 +346,44 @@ def signal_maker_1(data_core, future):
 
     # 신호 및 기본값 초기화
     current_price = data_core["last_1m"]["Close"]
-    trend_5m = data_core.get("current_trend_5m", 0)
+    rsi = data_core["last_5m"]["rsi"]
+    previous_rsi = data_core["previous_5m"]["rsi"]
 
-    GC_20_60 = trend_5m in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_trend_5m"] in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_5m"] < 5
-    GC_60_120 =  trend_5m in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_trend_5m"] in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_5m"] < 5
-    GC_rsi = data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] < data_core["previous_5m"]["rsi_signal"]
-
-    DC_20_60 = trend_5m in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_5m"] < 5
-    DC_60_120 =  trend_5m in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_5m"] < 5
-    DC_rsi = data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] > data_core["previous_5m"]["rsi_signal"]
+    trend_5m = data_core["current_trend_5m"]
 
     signal = "hold"
     weight = 0
     reason = []
-    stop_loss = current_price * 0.95
-    take_profit = current_price * 1.05
+    stop_loss = 0.9
+    take_profit = 1.1
 
-    # sma120 < sma60 < sma20
-    if trend_5m in [1, 2, 3]:
-        if data_core["volume_ratio"] > 1:
+    if trend_5m > 0:
+
+        if rsi < 35 and previous_rsi + 1 < rsi:
+            signal = "buy"
+            weight = 1
+            if rsi < 30:
+                weight += 1
+                if rsi < 25:
+                    weight += 1
+                    if rsi < 20:
+                        weight += 1
+                        if rsi < 15:
+                            weight += 1
+            reason = f"rsi = {rsi}, previous_rsi = {previous_rsi}"
+
+    if rsi > 65 and previous_rsi > rsi + 1:
+        signal = "sell"
+        weight = 1
+        if rsi > 70:
             weight += 1
-        if data_core["buy_volume_ratio"] > 0.6:
-            weight += 1
-        if GC_rsi and data_core["last_5m"]["rsi"] < 70:
-            weight += 2
-        if data_core["last_5m"]["percent_b"] > 0.4:
-            weight += 1
-        
-        if weight > 0:
-            if future:
-                signal = "L_buy"
-            else:
-                signal = "buy"
-        
-        # 손절조건
-        if data_core["last_5m"]["rsi"] < 50 and data_core["volume_ratio"] < 0.8 and data_core["last_5m"]["obv_slope_from_min"] > 0:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-        
-        # 익절조건
-        if data_core["last_5m"]["rsi"] > 70 and data_core["last_5m"]["rsi"] + 1 < data_core["previous_5m"]["rsi"]:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-    
-    # sma120 < sma20 < sma60
-    elif trend_5m in [7, 8, 9]:
-        if data_core["last_5m"]["obv_slope_from_min"] < 0:
-            weight += 1
-        if data_core["volume_ratio"] > 1.0 and data_core["buy_volume_ratio"] > 0.6:
-            weight += 1
-        if GC_rsi and 60 > data_core["last_5m"]["rsi"] > 50:
-            weight += 2
-        
-        if weight > 0:
-            if future:
-                signal = "L_buy"
-            else:
-                signal = "buy"
-
-        # 손절조건
-        if data_core["last_5m"]["percent_b"] < 0.4 and data_core["last_5m"]["rsi"] < 50:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-
-        # 익절조건
-        if data_core["volume_ratio"] < 0.8 and data_core["last_5m"]["rsi"] > 70:
-            if future:
-                signal = "L_sell"
-            else:
-                signal = "sell"
-            weight = 5
-
-    # sma20 < sma120 < sma60
-    # 일단 패스
-
-    # sma20 < sma60 < sma120
-    elif trend_5m in [-7, -8,-9]:
-        if DC_rsi and data_core["last_5m"]["rsi"] >30:
-            weight += 1
-        if data_core["volume_ratio"] > 0.8 and data_core["buy_volume_ratio"] < 0.4:
-            weight += 2
-        if data_core["last_5m"]["percent_b"] < 0.4:
-            weight += 1
-
-        if weight > 0:
-            if future:
-                signal = "S_buy"
-            else:
-                signal = "sell"
-
-        # 숏 손절조건
-        if GC_20_60 and data_core["buy_volume_ratio"] > 0.6 and data_core["volume_ratio"] > 0.8:
-            if future:
-                signal = "L_buy"
-                weight = 2
-            else:
-                signal = "buy"
-                weight = 2
-        
-        # 숏 익절조건
-        if data_core["last_5m"]["rsi"] < 25:
-            if future:
-                signal = "S_sell"
-                weight = 5
-
-    """
-    trend 변화
-    sma120 < sma60 < sma20    # 1, 2, 3
-    sma120 < sma20 < sma60    # 7, 8, 9
-    sma20 < sma120 < sma60    # -1, -2, -3
-    sma20 < sma60 < sma120    # -7, -8, -9
-    sma60 < sma20 < sma120    # -4, -5, -6
-    sma60 < sma120 < sma20    # 4, 5, 6
-    """
-
-    # 이동평균선 전략
-    """
-        **매수 조건**  
-    1. **전반적 상승 추세 확인**  
-    - 현재 가격이 120일 SMA 위에 있어야 함  
-    2. **단기 모멘텀 상승 신호**  
-    - 20일 EMA가 60일 EMA를 아래에서 위로 교차하는 순간 발생  
-        - 전일: 20일 EMA ≤ 60일 EMA  
-        - 당일: 20일 EMA > 60일 EMA  
-    3. **중기 확인**  
-    - 60일 EMA가 120일 SMA 위에 있어, 중기 추세도 상승임을 확인  
-    4. **추가 확인 (옵션)**  
-    - 거래량이 평균보다 상승하거나, RSI(14)가 50 이상이면 신호의 신뢰도 상승
-    ---
-
-    **매도 조건**  
-    1. **전반적 하락 추세 확인**  
-    - 현재 가격이 120일 SMA 아래에 있어야 함  
-    2. **단기 모멘텀 약세 신호**  
-    - 20일 EMA가 60일 EMA를 위에서 아래로 교차하는 순간 발생  
-        - 전일: 20일 EMA ≥ 60일 EMA  
-        - 당일: 20일 EMA < 60일 EMA  
-    3. **중기 확인**  
-    - 60일 EMA가 120일 SMA 아래에 있어, 중기 추세도 하락임을 확인  
-    4. **추가 확인 (옵션)**  
-    - 거래량 급증 시 가격 하락 동반, 또는 RSI(14)가 50 이하이면 신호 강화
-
-    """
-
-    # rsi 전략
-    """
-    **매수 조건**  
-    1. **과매도 구간:**  
-        - RSI14가 30 이하일 때, 시장이 과매도 상태임을 의미  
-    2. **반전 신호:**  
-        - RSI14가 자신의 14일 SMA(RSI SMA14)를 하향에서 상향 돌파할 때  
-        - 근거: 단순 과매도 상태에서 반등 신호가 발생하며, SMA와의 교차로 모멘텀 전환을 확인  
-    3. **추가 필터:**  
-        - 거래량이나 다른 모멘텀 지표로 상승 모멘텀을 추가 확인하면 신뢰도 상승
-
-    **매수 반전 신호 구체화**  
-    1. **과매도 구간 진입 확인**  
-        - RSI14가 30 이하에 머무르며 시장이 극심한 매도 압력을 받고 있음을 확인  
-        - 단, 단기 노이즈로 인한 스파이크 방지를 위해 2~3일 연속 30 이하인 경우를 고려
-    
-    2. **반전 교차 포착**  
-        - RSI14가 자신의 14일 SMA를 아래에서 위로 교차하는 순간을 포착  
-        - 교차 발생 시, RSI14가 30에서 상승하기 시작하고, SMA와의 간격이 서서히 벌어지는 패턴이면 강력한 반전 신호로 판단
-    
-    3. **추가 모멘텀 확인**  
-        - 교차 후 RSI14가 35 이상으로 상승하며, 상승세를 유지하는지 관찰  
-        - 거래량 증가나 가격 반등 등 다른 모멘텀 지표와 함께 나타난다면 신호의 신뢰도가 상승
-    
-    4. **실시간 모니터링 및 진입**  
-        - 반전 신호 발생 후 다음 캔들에서 확인 차 매수 진입  
-        - 단, 이후에도 RSI14가 단기적으로 하락 전환되는 모양새가 보이면 진입을 재검토
-    ---
-
-    **매도 조건**  
-    1. **과매수 구간:**  
-        - RSI14가 70 이상일 때, 시장이 과매수 상태임을 의미  
-    2. **반전 신호:**  
-        - RSI14가 자신의 14일 SMA를 상향에서 하향 돌파할 때  
-        - 근거: 과매수 상태에서 하락 전환 가능성이 커지며, SMA와의 교차가 단기 모멘텀 약화를 반영  
-    3. **추가 필터:**  
-        - 거래량 급증 등 추가 신호가 뒷받침되면 매도 신호의 신뢰도 강화
-    
-    **매도 반전 신호 구체화**  
-    1. **과매수 구간 진입 확인**  
-        - RSI14가 70 이상에 머무르며 과도한 매수 심리가 형성됨을 확인  
-        - 2~3일 연속 70 이상일 경우 과매수 구간이 안정적으로 유지되고 있다고 판단
-    
-    2. **반전 교차 포착**  
-        - RSI14가 자신의 14일 SMA를 위에서 아래로 교차하는 순간을 포착  
-        - 교차 발생 시, RSI14가 70 이하로 내려가면서 SMA와의 간격이 좁혀지는 패턴이면 강력한 반전 신호로 판단
-    
-    3. **추가 모멘텀 확인**  
-        - 교차 후 RSI14가 65 이하로 떨어지며, 하락세가 지속되는지 확인  
-        - 거래량 급증이나 가격 하락 모멘텀이 동반되면 신호의 신뢰도가 상승
-    
-    4. **실시간 모니터링 및 청산**  
-        - 반전 신호 발생 후 다음 캔들에서 확인 차 매도 진입 또는 포지션 청산  
-        - 이후 RSI14가 다시 상승하는 모양새를 보이면 조기 청산이나 포지션 축소 고려
-    """
-
-    # obv 전략
-    """
-    **매수 조건 (OBV 기반 반전 및 모멘텀 회복 신호)**
-
-    1. **장기 OBV 상승 추세 확인**  
-        - OBV가 최근 상승세를 보이며, 전반적으로 누적 매수 압력이 증가하고 있는지 확인  
-        - 근거: OBV가 상승하면 거래량과 가격 상승이 동반되어 상승 모멘텀이 강화됨
-
-    2. **최소값 대비 기울기 확인**  
-        - 최근 5개봉 OBV 최소값 대비 기울기 { (이전 5개봉 OBV 최소값 - 현재 OBV)/6 }가 양수로 전환되고 일정 수준(예: 0.5 이상)으로 증가  
-        - 근거: 과거 최저점 대비 현재 OBV가 상승세로 전환되면 매수세가 강화되는 신호로 볼 수 있음
-
-    3. **최대값 대비 기울기 안정성 검토 (옵션 필터)**  
-        - 최근 5개봉 OBV 최대값 대비 기울기 { (이전 5개봉 OBV 최대값 - 현재 OBV)/6 }는 상대적으로 낮은 수치를 유지하거나, 완만하게 변화  
-        - 근거: 매수 압력이 최고점에서 크게 하락하지 않고, 안정적으로 상승 모멘텀을 유지하고 있음을 암시
-
-    ---
-
-    **매도 조건 (OBV 기반 고점 다이버전스 및 약세 신호)**
-
-    1. **장기 OBV 하락 추세 확인**  
-        - OBV가 하락세에 있거나, 고점 대비 상승 폭이 줄어들어 매도 압력이 점차 커지는지 확인  
-        - 근거: OBV가 하락하면 거래량과 가격 하락이 동반되어 하락 모멘텀이 강화됨
-
-    2. **최대값 대비 기울기 확인**  
-        - 최근 5개봉 OBV 최대값 대비 기울기 { (이전 5개봉 OBV 최대값 - 현재 OBV)/6 }가 양수로 상승하며, 일정 임계치(예: 0.5 이상)를 초과  
-        - 근거: 최고점 대비 OBV가 크게 하락하면 매수세가 약화되고 매도 압력이 나타나는 신호로 볼 수 있음
-
-    3. **최소값 대비 기울기 안정성 검토 (옵션 필터)**  
-        - 최근 5개봉 OBV 최소값 대비 기울기는 크게 변화하지 않거나 완만한 하락세를 보일 경우, 이미 바닥을 찍은 상태로 판단  
-        - 근거: 최소값 대비 기울기가 크게 변화하지 않으면, 하락 모멘텀이 지속될 가능성이 크므로 매도 신호 강화
-    """
+            if rsi > 75:
+                weight += 1
+                if rsi > 80:
+                    weight += 1
+                    if rsi > 85:
+                        weight += 1
+        reason = f"rsi = {rsi}, previous_rsi = {previous_rsi}"
 
     return signal, weight, reason, stop_loss, take_profit
 
@@ -595,13 +393,35 @@ def signal_maker_2(data_core, future):
     current_price = data_core["last_1m"]["Close"]
     trend_5m = data_core.get("current_trend_5m", 0)
 
-    GC_20_60 = trend_5m in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_trend_5m"] in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_5m"] < 5
-    GC_60_120 =  trend_5m in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_trend_5m"] in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_5m"] < 5
-    GC_rsi = data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] < data_core["previous_5m"]["rsi_signal"]
+    GC_20_60 = (
+        trend_5m in [1, 2, 3, 4, 5, 6, -4, -5, -6]
+        and data_core["t1_trend_5m"] in [7, 8, 9, -1, -2, -3, -7, -8, -9]
+        and data_core["t1_5m"] < 5
+    )
+    GC_60_120 = (
+        trend_5m in [1, 2, 3, 7, 8, 9, -1, -2, -3]
+        and data_core["t1_trend_5m"] in [4, 5, 6, -4, -5, -6, -7, -8, -9]
+        and data_core["t1_5m"] < 5
+    )
+    GC_rsi = (
+        data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"]
+        and data_core["previous_5m"]["rsi"] < data_core["previous_5m"]["rsi_signal"]
+    )
 
-    DC_20_60 = trend_5m in [7, 8, 9, -1, -2, -3, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 4, 5, 6, -4, -5, -6] and data_core["t1_5m"] < 5
-    DC_60_120 =  trend_5m in [4, 5, 6, -4, -5, -6, -7, -8, -9] and data_core["t1_trend_5m"] in [1, 2, 3, 7, 8, 9, -1, -2, -3] and data_core["t1_5m"] < 5
-    DC_rsi = data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"] and data_core["previous_5m"]["rsi"] > data_core["previous_5m"]["rsi_signal"]
+    DC_20_60 = (
+        trend_5m in [7, 8, 9, -1, -2, -3, -7, -8, -9]
+        and data_core["t1_trend_5m"] in [1, 2, 3, 4, 5, 6, -4, -5, -6]
+        and data_core["t1_5m"] < 5
+    )
+    DC_60_120 = (
+        trend_5m in [4, 5, 6, -4, -5, -6, -7, -8, -9]
+        and data_core["t1_trend_5m"] in [1, 2, 3, 7, 8, 9, -1, -2, -3]
+        and data_core["t1_5m"] < 5
+    )
+    DC_rsi = (
+        data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"]
+        and data_core["previous_5m"]["rsi"] > data_core["previous_5m"]["rsi_signal"]
+    )
 
     # rsi 정규화
     rsi = data_core["last_5m"]["rsi"]
@@ -613,150 +433,377 @@ def signal_maker_2(data_core, future):
     stop_loss = 0.95
     take_profit = 1.05
 
-    # 이동평균선 활용 전략
+    # 1) 이동평균선 활용 전략
     if trend_5m in [1, 2, 3]:
-    # 진입조건
-        # 가격이 20일 이동평균선 지지 (0.4 < %b)
-        if data_core["last_5m"]["percent_b"] >0.4 and data_core["last_5m"]["SMA_20"] * 1.01 > current_price:
+        # 상승 추세로 간주
+        # 진입조건 예시
+        if data_core["last_5m"]["percent_b"] > 0.4 and data_core["last_5m"]["SMA_20"] * 1.01 > current_price:
             weight += 1
+            reason.append("20일선 근접 지지 및 Bollinger %b > 0.4")
 
-        # volume_ratio > 1.0
         if data_core["volume_ratio"] > 1.0:
             weight += 1
+            reason.append(f"거래량 증가(volume_ratio={data_core['volume_ratio']:.2f} > 1)")
 
-        # buy_volume_ratio > 0.6
         if data_core["buy_volume_ratio"] > 0.6:
             weight += 1
+            reason.append(f"시장가 매수 비중 증가(buy_volume_ratio={data_core['buy_volume_ratio']:.2f} > 0.6)")
 
-        # 골든크로스
         if GC_20_60:
             weight += 1
+            reason.append("20-60 이동평균선 골든크로스 발생")
             if GC_60_120:
                 weight += 1
+                reason.append("60-120 이동평균선 골든크로스 발생 추가")
 
-        # rsi 골든크로스
         if GC_rsi:
             weight += 2
+            reason.append("RSI 골든크로스")
 
-        # rsi > rsi_signal
         if data_core["last_5m"]["rsi"] > data_core["last_5m"]["rsi_signal"]:
             weight += 1
+            reason.append("RSI가 시그널 상향 돌파 중")
 
-        # obv_slope_from_max < 0
         if data_core["last_5m"]["obv_slope_from_max"] < 0:
             weight += 2
+            reason.append("OBV 고점 대비 기울기 하락(매수세 유입 가능성)")
 
-        weight = weight // 2 # weight 총합이 10이므로 2로 나눈 몫을 활용
+        # weight 보정
+        weight -= 5  # (예: 총합 10 정도면 절반 보정)
         if weight > 0:
             if future:
                 signal = "L_buy"
+                reason.append("선물 롱 진입")
             else:
                 signal = "buy"
-            
+                reason.append("현물 매수")
             stop_loss = 0.97
             take_profit = 1.1
+        elif weight < 0:
+            # 음수면 0으로 고정
+            weight = 0
 
-    # 손절조건
-        # 가격이 20일 이동평균선 하향돌파 (%b < 0.4)
+        # 손절조건 예시
         if data_core["last_5m"]["percent_b"] < 0.4:
             if future:
                 signal = "L_sell"
+                reason.append("하락 반전으로 롱 포지션 손절(%b < 0.4)")
             else:
                 signal = "sell"
-
+                reason.append("하락 반전으로 현물 청산(%b < 0.4)")
             weight = 5
 
     elif trend_5m in [-7, -8, -9]:
-    # 진입조건
-        # 가격이 20일 이동평균선 저항 (%b < 0.6)
+        # 하락 추세로 간주
+        # 진입조건 예시
         if data_core["last_5m"]["percent_b"] < 0.6:
             weight += 1
+            reason.append("20일선 저항 가능성(%b < 0.6)")
 
-        # volume_ratio > 1.0
         if data_core["volume_ratio"] > 1.0:
             weight += 1
+            reason.append(f"거래량 증가(volume_ratio={data_core['volume_ratio']:.2f} > 1)")
 
-        # buy_volume_ratio < 0.4
         if data_core["buy_volume_ratio"] < 0.4:
             weight += 1
+            reason.append(f"매수세 비중 감소(buy_volume_ratio={data_core['buy_volume_ratio']:.2f} < 0.4)")
 
-        # 데드크로스
         if DC_20_60:
             weight += 1
+            reason.append("20-60 이동평균선 데드크로스")
             if DC_60_120:
                 weight += 1
+                reason.append("60-120 이동평균선 데드크로스")
 
-        # rsi 데드크로스
         if DC_rsi:
             weight += 2
+            reason.append("RSI 데드크로스")
 
-        # rsi < rsi_signal
         if data_core["last_5m"]["rsi"] < data_core["last_5m"]["rsi_signal"]:
             weight += 1
+            reason.append("RSI가 시그널 하향 돌파 중")
 
-        # obv_slope_from_min > 0
         if data_core["last_5m"]["obv_slope_from_min"] > 0:
             weight += 2
+            reason.append("OBV 저점 대비 기울기 상승 → 매도세 유입")
 
-        weight = weight // 2
+        weight -= 5
         if weight > 0:
+            # 숏 진입
             if future:
                 signal = "S_buy"
-
+                reason.append("선물 숏 진입")
                 stop_loss = 1.05
                 take_profit = 0.9
             else:
                 signal = "sell"
+                reason.append("현물 매도")
+        elif weight < 0:
+            weight = 0
 
-    # 손절조건
-        # 가격이 20일 이동평균선 상향돌파 (0.6 < %b)
+        # 손절조건 예시
         if data_core["last_5m"]["percent_b"] > 0.6:
             if future:
                 signal = "S_sell"
-                weight = 5
-
-    else:
-    # 볼린저밴드를 활용한 박스권 매매
-    # 밴드폭이 급격히 줄어드는 스퀴즈 구간 주의
-        # 롱 포지션
-        if data_core["last_5m"]["percent_b"] < 0.1:
-            weight += 1
-        if 0.7 < data_core["volume_ratio"] < 1.0:
-            weight -= 1
-        if data_core["buy_volume_ratio"] > 0.5:
-            weight += 1
-        if data_core["last_5m"]["rsi"] < 30:
-            weight += 2
-        elif data_core["last_5m"]["rsi"] < 45:
-            weight += 1
-        
-        # 숏 포지션
-        if data_core["last_5m"]["percent_b"] > 0.9:
-            weight -= 1
-        if 0.7 < data_core["volume_ratio"] < 1.0:
-            weight -= 1
-        if data_core["buy_volume_ratio"] < 0.5:
-            weight -= 1
-        if data_core["last_5m"]["rsi"] > 70:
-            weight -= 2
-        elif data_core["last_5m"]["rsi"] > 55:
-            weight -= 1
-
-        if weight > 0:
-            if future:
-                signal = "L_buy"
-            else:
-                signal = "buy"
-        
-        elif weight < 0:
-            weight *= -1
-            if future:
-                signal = "S_buy"
+                reason.append("상승 반전으로 숏 포지션 손절(%b > 0.6)")
             else:
                 signal = "sell"
+                reason.append("상승 반전으로 포지션 정리(%b > 0.6)")
+            weight = 5
 
+    else:
+        # 박스권 등 기타 추세
+        # 아래는 예시로 숏 조건만 체크한 뒤, 음수 가중치면 매도 신호를 준 코드
+        if data_core["last_5m"]["percent_b"] > 0.9:
+            weight -= 1
+            reason.append("Bollinger 상단 접근(%b > 0.9) → 숏 우위")
+        if 0.7 < data_core["volume_ratio"] < 1.0:
+            weight -= 1
+            reason.append(f"거래량 애매(volume_ratio={data_core['volume_ratio']:.2f}) → 숏 우위")
+        if data_core["buy_volume_ratio"] < 0.5:
+            weight -= 1
+            reason.append(f"매수세 부족(buy_volume_ratio={data_core['buy_volume_ratio']:.2f} < 0.5)")
+        if data_core["last_5m"]["rsi"] > 70:
+            weight -= 2
+            reason.append(f"RSI 과매수(rsi={data_core['last_5m']['rsi']:.2f} >70)")
+        elif data_core["last_5m"]["rsi"] > 55:
+            weight -= 1
+            reason.append(f"RSI 다소 높음(rsi={data_core['last_5m']['rsi']:.2f} >55)")
+
+        # 숏 진입
+        if weight < 0:
+            weight *= -1  # 절댓값으로 사용
+            if future:
+                signal = "S_buy"
+                reason.append("선물 숏 진입")
+            else:
+                signal = "sell"
+                reason.append("현물 매도")
+
+        # 추가 예시: RBW < 0.8 일 때 강제 매도
         if data_core["last_5m"]["RBW"] < 0.8:
-            weight = 0
-            signal = "hold"
+            weight = 5
+            signal = "sell"
+            reason.append(f"밴드폭 축소(RBW={data_core['last_5m']['RBW']:.2f} <0.8) → 리스크 회피 매도")
 
-    return signal, weight, reason, stop_loss, take_profit
+    # reason 리스트를 합쳐 문자열로 변환
+    reason_str = " | ".join(reason)
+
+    return signal, weight, reason_str, stop_loss, take_profit
+
+def signal_maker_3(data_core, future):
+    """
+    안정적인 수익과 낮은 리스크를 목표로 하며, 불필요한 손절(stop_loss) 발생을 줄이고
+    확실한 상승 모멘텀이 확인될 때만 진입하는 전략.
+    
+    주요 조건:
+      - 1시간봉에서 강한 상승 추세 (예: trend_1h >= 2)와 함께
+      - 1분봉에서 RSI < 30, %b < 0.25, 거래량 비율 >= 1.0,
+      - 5분봉의 추가 모멘텀 지표(예: MACD 양의 교차 또는 단기 상승 모멘텀) 조건을 만족할 때.
+    
+    동적 손절폭은 Bollinger 하단을 기준으로 계산하되, 80%~90% 범위를 참고합니다.
+    
+    반환:
+      signal: "buy", "sell" 또는 "hold"
+      weight: 거래 강도 (정수)
+      reason: 신호 발생 근거 설명 문자열
+      stop_loss: 손절 배수 (예: 0.97 => 진입가의 97%)
+      take_profit: 익절 배수 (예: 1.03 => 진입가의 103%)
+    """
+    # 1) 기본 변수 설정 (1분봉 기준)
+    current_price = data_core["last_5m"]["Close"]
+    rsi = data_core["last_5m"].get("rsi", 50)
+    percent_b = data_core["last_5m"].get("percent_b", 0.5)
+    volume_ratio = data_core.get("volume_ratio", 1)
+    trend_1h = data_core.get("current_trend_1h", 0)
+    
+    # Bollinger 밴드 하단 값 (없을 경우 기본값 설정)
+    lower_boll = data_core["last_5m"].get("lower_boll", current_price * 0.97)
+    
+    # OBV 기울기 (매수의 경우 OBV 고점 대비 기울기 사용)
+    obv_slope_buy = data_core["last_5m"].get("obv_slope_from_max", 0)
+    
+    # 추가: 5분봉의 단기 모멘텀 필터 (예: MACD나 단기 추세 변화 - 여기서는 trend_5m 활용)
+    trend_5m = data_core.get("current_trend_5m", 0)
+    
+    signal = "hold"
+    weight = 0
+    reason = []
+    
+    # 기본 익절 목표 배수 (take_profit)와 손절 목표 배수 (stop_loss)를 설정 (배수 형태)
+    take_profit = 1.03  # 103%
+    stop_loss = 0.97    # 97%
+    
+    # 2) 강한 상승 모멘텀 필터: 1시간봉 강한 상승 추세와 단기 조건 강화
+    if trend_1h >= 0:
+        if rsi < 30 and percent_b < 0.25 and volume_ratio >= 1.1:
+            # 추가 모멘텀 조건: 5분봉 추세가 상승이면 weight 증가
+            if trend_5m > 0:
+                signal = "buy"
+                weight += 3
+                reason.append("강한 1h 상승 추세, 1분봉 과매도, 낮은 %b, 거래량 증가, 5분 추세 상승")
+            else:
+                signal = "buy"
+                weight += 2
+                reason.append("강한 1h 상승 추세, 1분봉 과매도, 낮은 %b, 거래량 증가")
+            
+            # 동적 손절폭: Bollinger 하단과의 거리를 80% 반영하여 계산 (보수적 손절)
+            dynamic_sl = current_price - (current_price - lower_boll) * 0.8
+            # stop_loss를 기존 0.97과 비교하여 더 낮은 값을 선택 (즉, 더 넓은 손절폭)
+            stop_loss = min(dynamic_sl / current_price, 0.97)
+        else:
+            signal = "hold"
+            reason.append("롱 진입 조건 미충족 (RSI, %b, 거래량 기준 미달)")
+    else:
+        signal = "hold"
+        reason.append("1h 강한 상승 추세 미확인")
+    
+    # 3) OBV 모멘텀 추가 확인: OBV 기울기가 충분히 양수면 추가 weight 부여
+    if signal == "buy":
+        if obv_slope_buy > 0.5:
+            weight += 1
+            reason.append("OBV 모멘텀 매우 강함")
+        else:
+            reason.append("OBV 모멘텀 보통")
+    
+    if weight < 0:
+        weight = 0
+
+    reason_str = " | ".join(reason)
+    return signal, weight, reason_str, stop_loss, take_profit
+
+def signal_maker_5(data_core, future):
+    """
+    개선된 전략(5분봉 기반)을 바탕으로 한 매매 신호 생성 함수.
+    
+    주요 지표:
+      - 이동평균선: SMA_20, SMA_60, SMA_120
+      - 볼린저밴드: lower_boll, upper_boll, percent_b
+      - MACD: MACD, MACD_signal (이전 5분봉 값도 사용)
+      - ADX: ADX (5분봉 기준, 강한 추세는 ADX > 25)
+      - ATR: ATR (위험관리용)
+    
+    매수(상승) 신호 조건:
+      1. 상승 추세: SMA_20 > SMA_60 > SMA_120  + ADX > 25
+      2. 가격가 볼린저밴드 하단 근접 (현재가와 lower_boll 차이가 1% 이내)
+      3. MACD 골든크로스: 이전 5분봉에서 MACD < MACD_signal, 최신 5분봉에서 MACD > MACD_signal
+      → 조건 2개 이상 충족 시 매수 신호 발생.
+      손절: (진입가 - 3×ATR) / 진입가, 익절: (진입가 + 4×ATR) / 진입가
+      
+    매도(하락) 신호 조건:
+      1. 하락 추세: SMA_20 < SMA_60 < SMA_120  + ADX > 25
+      2. 가격이 볼린저밴드 상단 근접 (현재가와 upper_boll 차이가 1% 이내)
+      3. MACD 데드크로스: 이전 5분봉에서 MACD > MACD_signal, 최신 5분봉에서 MACD < MACD_signal
+      → 조건 2개 이상 충족 시 매도 신호 발생.
+      손절: (진입가 + 3×ATR) / 진입가, 익절: (진입가 - 4×ATR) / 진입가
+      
+    future가 True인 경우, 신호 문자열은 선물용("L_buy", "S_sell")으로 반환합니다.
+    
+    반환:
+      signal: "buy", "sell", "hold" (또는 선물의 경우 "L_buy", "S_sell")
+      weight: 충족된 조건 수 (최대 4)
+      reason: 신호 발생 근거 설명 문자열
+      stop_loss: 손절 배수 (예: 0.98은 진입가 대비 98%)
+      take_profit: 익절 배수 (예: 1.03은 진입가 대비 103%)
+    """
+    # 1) 기본 변수 설정 (5분봉 최신 데이터 기준)
+    current_price = data_core["last_5m"]["Close"]
+    SMA_20 = data_core["last_5m"].get("SMA_20")
+    SMA_60 = data_core["last_5m"].get("SMA_60")
+    SMA_120 = data_core["last_5m"].get("SMA_120")
+    lower_boll = data_core["last_5m"].get("lower_boll")
+    upper_boll = data_core["last_5m"].get("upper_boll")
+    ADX = data_core["last_5m"].get("ADX", 0)
+    ATR = data_core["last_5m"].get("ATR", 0)
+    MACD = data_core["last_5m"].get("MACD", 0)
+    MACD_signal = data_core["last_5m"].get("MACD_signal", 0)
+    
+    # 이전 5분봉의 MACD 값 (있을 경우)
+    prev_data = data_core.get("previous_5m", {})
+    prev_MACD = prev_data.get("MACD", 0)
+    prev_MACD_signal = prev_data.get("MACD_signal", 0)
+    
+    # 2) 조건 체크 변수 초기화
+    buy_conditions = 0
+    sell_conditions = 0
+    reasons_buy = []
+    reasons_sell = []
+    
+    # 추세 조건
+    uptrend = (SMA_20 is not None and SMA_60 is not None and SMA_120 is not None and (SMA_20 > SMA_60 > SMA_120))
+    downtrend = (SMA_20 is not None and SMA_60 is not None and SMA_120 is not None and (SMA_20 < SMA_60 < SMA_120))
+    
+    if uptrend and ADX > 25:
+        buy_conditions += 2
+        reasons_buy.append("상승 추세 확인 (SMA_20 > SMA_60 > SMA_120) 및 ADX > 25")
+    else:
+        reasons_buy.append("상승 추세 조건 미충족")
+    
+    if downtrend and ADX > 25:
+        sell_conditions += 2
+        reasons_sell.append("하락 추세 확인 (SMA_20 < SMA_60 < SMA_120) 및 ADX > 25")
+    else:
+        reasons_sell.append("하락 추세 조건 미충족")
+    
+    # 볼린저밴드 조건: 매수는 가격가 하단 근접, 매도는 가격가 상단 근접 (차이가 1% 이내)
+    if lower_boll is not None:
+        if abs(current_price - lower_boll) / current_price < 0.01:
+            buy_conditions += 1
+            reasons_buy.append("가격이 볼린저밴드 하단 근접")
+        else:
+            reasons_buy.append("볼린저밴드 하단 미접근")
+    else:
+        reasons_buy.append("볼린저밴드 하단 데이터 없음")
+    
+    if upper_boll is not None:
+        if abs(upper_boll - current_price) / current_price < 0.01:
+            sell_conditions += 1
+            reasons_sell.append("가격이 볼린저밴드 상단 근접")
+        else:
+            reasons_sell.append("볼린저밴드 상단 미접근")
+    else:
+        reasons_sell.append("볼린저밴드 상단 데이터 없음")
+    
+    # MACD 조건: 매수는 골든크로스, 매도는 데드크로스
+    if prev_MACD < prev_MACD_signal and MACD > MACD_signal:
+        buy_conditions += 1
+        reasons_buy.append("MACD 골든크로스 발생")
+    else:
+        reasons_buy.append("MACD 골든크로스 미발생")
+    
+    if prev_MACD > prev_MACD_signal and MACD < MACD_signal:
+        sell_conditions += 1
+        reasons_sell.append("MACD 데드크로스 발생")
+    else:
+        reasons_sell.append("MACD 데드크로스 미발생")
+    
+    # 3) 매수 신호 판단 (최소 2개 조건 이상 충족)
+    if buy_conditions >= 3:
+        signal = "buy" if not future else "L_buy"
+        weight = min(buy_conditions, 4)
+        # ATR 기반 손절/익절 계산: 완화된 조건 적용 (예: 3×ATR, 4×ATR)
+        if ATR > 0:
+            stop_loss = (current_price - 3 * ATR) / current_price  # 매수 시 손절: 진입가 대비 3×ATR 하락
+            take_profit = (current_price + 4 * ATR) / current_price  # 매수 시 익절: 진입가 대비 4×ATR 상승
+        else:
+            stop_loss = 0.97
+            take_profit = 1.04
+        reasons_buy.append(f"매수 실행: 조건 {buy_conditions}개 충족, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
+        return signal, weight, " | ".join(reasons_buy), stop_loss, take_profit
+
+    # 4) 매도 신호 판단 (최소 2개 조건 이상 충족)
+    if sell_conditions >= 3:
+        signal = "sell" if not future else "S_sell"
+        weight = min(sell_conditions, 4)
+        if ATR > 0:
+            stop_loss = (current_price + 3 * ATR) / current_price  # 매도 시 손절: 진입가 대비 3×ATR 상승
+            take_profit = (current_price - 4 * ATR) / current_price  # 매도 시 익절: 진입가 대비 4×ATR 하락
+        else:
+            stop_loss = 1.03
+            take_profit = 0.96
+        reasons_sell.append(f"매도 실행: 조건 {sell_conditions}개 충족, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
+        return signal, weight, " | ".join(reasons_sell), stop_loss, take_profit
+
+    # 5) 조건 미충족 시 Hold 반환
+    overall_reason = "매수 조건: " + " | ".join(reasons_buy) + " || 매도 조건: " + " | ".join(reasons_sell)
+    return "hold", 0, overall_reason, 0.5, 2.0
