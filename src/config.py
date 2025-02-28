@@ -43,8 +43,6 @@ class Config():
             raise ValueError("seed money 환경변수가 제대로 설정되지 않았습니다.")
         elif not self.coin_tickers:
             raise ValueError("coin tickers 환경변수가 제대로 설정되지 않았습니다.")
-        elif not self.futures_use:
-            raise ValueError("futures_use 환경변수가 제대로 설정되지 않았습니다.")
         elif not self.futures_leverage:
             raise ValueError("futures_leverage 환경변수가 제대로 설정되지 않았습니다.")
         elif not self.futures_margin_type:
