@@ -101,40 +101,39 @@ class BacktestEngine:
 
         elif signal == "sell" and self.entry_price is not None:
             if self.position == "long" and self.current_weight > 0 and signal_weight > 0:
-                if current_price > self.entry_price * 1.005 or trade_type != "TRADE":
-                    sell_weight = min(self.current_weight, signal_weight)
-                    sell_amount = max(self.total_holdings * (sell_weight / self.current_weight), 0.00001)
-                    if sell_amount > self.total_holdings:
-                        sell_amount = self.total_holdings
-                    self.total_holdings -= sell_amount
-                    profit = (current_price - self.entry_price) / self.entry_price * 100
-                    PnL = (current_price - self.entry_price) * sell_amount
-                    self.balance += sell_amount * current_price * (1 - self.trading_fee)
-                    self.current_weight -= sell_weight
+                sell_weight = min(self.current_weight, signal_weight)
+                sell_amount = max(self.total_holdings * (sell_weight / self.current_weight), 0.00001)
+                if sell_amount > self.total_holdings:
+                    sell_amount = self.total_holdings
+                self.total_holdings -= sell_amount
+                profit = (current_price - self.entry_price) / self.entry_price * 100
+                PnL = (current_price - self.entry_price) * sell_amount
+                self.balance += sell_amount * current_price * (1 - self.trading_fee)
+                self.current_weight -= sell_weight
 
-                    self.trade_history.append({
-                        "type": trade_type,
-                        "price": current_price,
-                        "qty": sell_amount,
-                        "weight": self.current_weight,
-                        "pnl": profit,
-                        "reason": signal_info["reason"],
-                        "stop_loss": self.entry_stop_loss,
-                        "take_profit": self.entry_take_profit
-                    })
-                    print(f"[{trade_type}] SELL {sell_amount:.6f} at ${current_price:.2f} | profit: {profit:.2f}% | PnL: ${PnL:.2f} | weight: {signal_weight} | holdings: {self.total_holdings:.6f} | balance: ${self.balance:.2f}")
-                    print(signal_info["reason"])
-                    # 포지션이 완전히 청산되면, 진입 시 손절/익절 값 초기화
-                    if self.current_weight == 0:
-                        self.position = None
-                        self.entry_price = None
-                        self.entry_stop_loss = None
-                        self.entry_take_profit = None
-                        if self.total_holdings > 0:
-                            self.balance += self.total_holdings * current_price * (1 - self.trading_fee)
-                            self.total_holdings = 0
-                        else:
-                            self.total_holdings = 0
+                self.trade_history.append({
+                    "type": trade_type,
+                    "price": current_price,
+                    "qty": sell_amount,
+                    "weight": self.current_weight,
+                    "pnl": profit,
+                    "reason": signal_info["reason"],
+                    "stop_loss": self.entry_stop_loss,
+                    "take_profit": self.entry_take_profit
+                })
+                print(f"[{trade_type}] SELL {sell_amount:.6f} at ${current_price:.2f} | profit: {profit:.2f}% | PnL: ${PnL:.2f} | weight: {signal_weight} | holdings: {self.total_holdings:.6f} | balance: ${self.balance:.2f}")
+                print(signal_info["reason"])
+                # 포지션이 완전히 청산되면, 진입 시 손절/익절 값 초기화
+                if self.current_weight == 0:
+                    self.position = None
+                    self.entry_price = None
+                    self.entry_stop_loss = None
+                    self.entry_take_profit = None
+                    if self.total_holdings > 0:
+                        self.balance += self.total_holdings * current_price * (1 - self.trading_fee)
+                        self.total_holdings = 0
+                    else:
+                        self.total_holdings = 0
         self.update_mdd(current_price)
 
     def get_trade_history(self):
