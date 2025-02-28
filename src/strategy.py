@@ -32,20 +32,19 @@ class Strategy:
         """
 
         try:
-            data_core = src.utils.data_source(data_dict)
 
-            signal, weight, reason, stop_loss, take_profit = src.utils.signal_maker_5(data_core, future)
+            current_price, signal, weight, reason, stop_loss, take_profit = src.utils.MACD_signal(data_dict, future)
+
+            print(signal, reason)
 
             # 결과 반환
             return {
-                "current_price": data_core["last_5m"]["Close"],
+                "current_price": current_price,
                 "signal": signal,
                 "weight": weight,
                 "reason": reason,
                 "stop_loss":stop_loss,
                 "take_profit":take_profit,
-                "trend_5m": data_core["current_trend_5m"],
-                "trend_1h": data_core["current_trend_1h"],
             }
         except Exception as e:
             print(f"signal 함수 오류: {e}")
