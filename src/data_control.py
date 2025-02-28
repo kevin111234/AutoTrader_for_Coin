@@ -386,25 +386,17 @@ class Data_Control():
         df.drop(columns=['TR'], inplace=True)
         return df
 
-
     def cal_macd(self, df, fast_period=12, slow_period=26, signal_period=9):
         """
-        MACD(Moving Average Convergence Divergence)와 MACD Signal을 순차적으로 계산하는 함수.
-        
-        매개변수:
-          df : pandas DataFrame - 'Close' 컬럼 필수.
-          fast_period : int - 단기 EMA 기간 (기본값 12)
-          slow_period : int - 장기 EMA 기간 (기본값 26)
-          signal_period : int - MACD Signal EMA 기간 (기본값 9)
-        
-        반환:
-          df : MACD와 MACD_signal 컬럼이 추가된 DataFrame.
+        MACD, MACD Signal, MACD Histogram 계산 함수 (수정 버전)
         """
-        # MACD와 MACD_signal 컬럼이 없으면 생성
+        # MACD 관련 컬럼 생성
         if 'MACD' not in df.columns:
             df['MACD'] = np.nan
         if 'MACD_signal' not in df.columns:
             df['MACD_signal'] = np.nan
+        if 'MACD_histogram' not in df.columns:
+            df['MACD_histogram'] = np.nan
 
         # EMA 계산을 위한 multiplier
         multiplier_fast = 2 / (fast_period + 1)
@@ -417,26 +409,21 @@ class Data_Control():
 
         for i in range(len(df)):
             close_val = df.loc[i, 'Close']
+
             if i == 0:
-                # 초기값 설정: 첫 행은 EMA를 Close 값으로 초기화
                 ema_fast = close_val
                 ema_slow = close_val
                 macd = 0.0
                 macd_signal = 0.0
-                df.loc[i, 'MACD'] = macd
-                df.loc[i, 'MACD_signal'] = macd_signal
             else:
-                # EMA 업데이트: (현재 값 - 이전 EMA) * multiplier + 이전 EMA
                 ema_fast = (close_val - ema_fast) * multiplier_fast + ema_fast
                 ema_slow = (close_val - ema_slow) * multiplier_slow + ema_slow
                 macd = ema_fast - ema_slow
-                df.loc[i, 'MACD'] = macd
-                # MACD Signal 업데이트
-                if i == 1:
-                    macd_signal = macd  # 첫 MACD Signal 초기화
-                else:
-                    macd_signal = (macd - macd_signal) * multiplier_signal + macd_signal
-                df.loc[i, 'MACD_signal'] = macd_signal
+                macd_signal = (macd - macd_signal) * multiplier_signal + macd_signal
+
+            df.loc[i, 'MACD'] = macd
+            df.loc[i, 'MACD_signal'] = macd_signal
+            df.loc[i, 'MACD_histogram'] = macd - macd_signal
 
         return df
 
