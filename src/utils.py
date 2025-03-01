@@ -91,7 +91,6 @@ def MACD_signal(data_dict, future, account_info):
 
     # 최신 종가 (문자열일 경우 float 변환)
     current_price = float(df['Close'].iloc[-1])
-    current_trend = int(df["trend"].iloc[-1])
 
     if entry_price is None or entry_price == 0:
         profit_rate = 0
@@ -107,7 +106,9 @@ def MACD_signal(data_dict, future, account_info):
     ma_up = (sma20 > sma60) and (sma60 > sma120)
     ma_down = (sma120 > sma60) and (sma60 > sma20)
 
-    if current_trend == 0:
+    isnear2060 = abs(sma20 - sma60) <= abs(sma60) * 0.005
+
+    if isnear2060:
         ma_up = False
         ma_down = False
     
