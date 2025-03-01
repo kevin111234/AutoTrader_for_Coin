@@ -1,4 +1,11 @@
-from config import Config
+import sys
+import os
+
+# 프로젝트 루트 디렉토리의 절대 경로를 구함
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from src.config import Config
 
 import pandas as pd
 import numpy as np
@@ -173,91 +180,6 @@ class Data_Control():
 
         return df
 
-    def cal_tpo_volume_profile(self, data, 
-                              price_col='Close', 
-                              volume_col='Volume', 
-                              taker_buy_col='Taker Buy Base Asset Volume', 
-                              taker_sell_col='Taker Sell Base Asset Volume', 
-                              bins=20):
-        """
-        TPO(Time at Price)와 볼륨 프로파일(VP)을 함께 계산하는 함수.
-        또한 Taker Buy / Sell 거래량을 구간별로 집계할 수 있습니다.
-        
-        :param data: 가격, 거래량 및 Taker Buy/Sell 칼럼을 포함한 Pandas DataFrame
-        :param price_col: 가격 컬럼명(기본값: 'Close')
-        :param volume_col: 전체 거래량 컬럼명(기본값: 'Volume')
-        :param taker_buy_col: Taker 매수 거래량 컬럼명(기본값: 'Taker Buy Base Asset Volume')
-        :param taker_sell_col: Taker 매도 거래량 컬럼명(기본값: 'Taker Sell Base Asset Volume')
-        :param bins: 가격 구간(bin) 수 (기본값: 20)
-        :return: 
-            profile_df: 각 가격 구간별 VP, TPO, Taker Buy/Sell Volume 정보를 담은 DataFrame
-            sr_levels: POC 및 상위 레벨 정보를 담은 dictionary
-        """
-
-        prices = data[price_col]
-        volumes = data[volume_col]
-
-        # Taker 매수/매도 거래량 시리즈
-        taker_buy_volumes = data[taker_buy_col]
-        taker_sell_volumes = data[taker_sell_col]
-
-        # 가격 범위 설정
-        price_min, price_max = prices.min(), prices.max()
-        bin_edges = np.linspace(price_min, price_max, bins + 1)
-
-        # 각 가격이 속하는 구간 식별
-        bin_indices = np.digitize(prices, bin_edges)  # 결과는 1 ~ bins+1 범위
-
-        # 볼륨 프로파일: 구간별 거래량 합계
-        volume_profile = pd.Series(0.0, index=range(1, bins + 1))
-        # TPO 프로파일: 구간별 등장 횟수(= 시장이 해당 가격대 근처에 머문 횟수)
-        tpo_profile = pd.Series(0, index=range(1, bins + 1))
-        # Taker Buy/Sell 구간별 거래량
-        taker_buy_profile = pd.Series(0.0, index=range(1, bins + 1))
-        taker_sell_profile = pd.Series(0.0, index=range(1, bins + 1))
-
-        # 각 행에 대해 해당 구간에 거래량 및 TPO 할당
-        for idx, vol, tb_vol, ts_vol in zip(bin_indices, volumes, taker_buy_volumes, taker_sell_volumes):
-            if 1 <= idx <= bins:
-                volume_profile[idx] += vol
-                tpo_profile[idx] += 1
-                taker_buy_profile[idx] += tb_vol
-                taker_sell_profile[idx] += ts_vol
-
-        # 결과 DataFrame 생성
-        profile_df = pd.DataFrame({
-            'Bin': range(1, bins + 1),
-            'Price_Low': bin_edges[:-1],
-            'Price_High': bin_edges[1:],
-            'Volume': volume_profile.values,
-            'TPO': tpo_profile.values,
-            'Taker_Buy_Volume': taker_buy_profile.values,
-            'Taker_Sell_Volume': taker_sell_profile.values
-        })
-
-        # 거래량과 TPO 모두 상위권인 구간 식별 (간단한 가중합 방식)
-        profile_df['Volume_norm'] = profile_df['Volume'] / profile_df['Volume'].sum() if profile_df['Volume'].sum() != 0 else 0
-        profile_df['TPO_norm'] = profile_df['TPO'] / profile_df['TPO'].sum() if profile_df['TPO'].sum() != 0 else 0
-        profile_df['Score'] = profile_df['Volume_norm'] + profile_df['TPO_norm']
-
-        # Score 기준 내림차순 정렬
-        sorted_df = profile_df.sort_values('Score', ascending=False).reset_index(drop=True)
-        
-        # 상위 3개를 잠재적 지지/저항 구간으로 추출 (예시)
-        top_zones = sorted_df.head(3)
-
-        # 가장 높은 Score를 가진 구간을 POC(Point of Control)로 간주
-        poc = top_zones.iloc[0].to_dict()
-        other_zones = top_zones.iloc[1:].to_dict('records')
-
-        # 지지/저항선 정보 dictionary
-        sr_levels = {
-            'POC': poc,
-            'Levels': other_zones
-        }
-
-        return profile_df, sr_levels
-
     def cal_obv(self, df, price_col='Close', volume_col='Volume',
                 obv_col='obv', period_1=5, period_2 = 60):
         """
@@ -420,6 +342,205 @@ class Data_Control():
         # 최종적으로 obv, obv_slope_from_max, obv_slope_from_min 등을 포함한 df 반환
         return df
 
+    def cal_atr(self, df, period=14):
+        """
+        ATR(Average True Range)을 순차적으로 계산하는 함수.
+        
+        매개변수:
+          df : pandas DataFrame - 'High', 'Low', 'Close' 컬럼 필수.
+          period : int - ATR 계산 기간 (기본값 14)
+        
+        반환:
+          df : ATR 컬럼이 추가된 DataFrame.
+        """
+        # ATR 컬럼이 없으면 생성
+        if 'ATR' not in df.columns:
+            df['ATR'] = np.nan
+
+        # 중간 계산을 위한 True Range(TR) 컬럼 생성 (임시)
+        if 'TR' not in df.columns:
+            df['TR'] = np.nan
+
+        # 각 행마다 TR 계산 (0번 행은 High-Low)
+        for i in range(len(df)):
+            if i == 0:
+                df.loc[i, 'TR'] = df.loc[i, 'High'] - df.loc[i, 'Low']
+            else:
+                diff1 = df.loc[i, 'High'] - df.loc[i, 'Low']
+                diff2 = abs(df.loc[i, 'High'] - df.loc[i - 1, 'Close'])
+                diff3 = abs(df.loc[i, 'Low'] - df.loc[i - 1, 'Close'])
+                df.loc[i, 'TR'] = max(diff1, diff2, diff3)
+
+        # ATR은 period 기간의 TR 평균 (최소 period 개수부터 계산)
+        last_valid_atr = df['ATR'].last_valid_index()
+        if last_valid_atr is None:
+            last_valid_atr = -1
+
+        for i in range(last_valid_atr + 1, len(df)):
+            if i < period - 1:
+                continue  # 데이터가 충분하지 않으면 계산하지 않음
+            atr_val = df.loc[i - period + 1:i, 'TR'].mean()
+            df.loc[i, 'ATR'] = atr_val
+
+        # 임시 TR 컬럼 삭제
+        df.drop(columns=['TR'], inplace=True)
+        return df
+
+    def cal_macd(self, df, fast_period=12, slow_period=26, signal_period=9):
+        """
+        MACD, MACD Signal, MACD Histogram 계산 함수 (수정 버전)
+        """
+        # MACD 관련 컬럼 생성
+        if 'MACD' not in df.columns:
+            df['MACD'] = np.nan
+        if 'MACD_signal' not in df.columns:
+            df['MACD_signal'] = np.nan
+        if 'MACD_histogram' not in df.columns:
+            df['MACD_histogram'] = np.nan
+
+        # EMA 계산을 위한 multiplier
+        multiplier_fast = 2 / (fast_period + 1)
+        multiplier_slow = 2 / (slow_period + 1)
+        multiplier_signal = 2 / (signal_period + 1)
+
+        ema_fast = None
+        ema_slow = None
+        macd_signal = None
+
+        for i in range(len(df)):
+            close_val = df.loc[i, 'Close']
+
+            if i == 0:
+                ema_fast = close_val
+                ema_slow = close_val
+                macd = 0.0
+                macd_signal = 0.0
+            else:
+                ema_fast = (close_val - ema_fast) * multiplier_fast + ema_fast
+                ema_slow = (close_val - ema_slow) * multiplier_slow + ema_slow
+                macd = ema_fast - ema_slow
+                macd_signal = (macd - macd_signal) * multiplier_signal + macd_signal
+
+            df.loc[i, 'MACD'] = macd
+            df.loc[i, 'MACD_signal'] = macd_signal
+            df.loc[i, 'MACD_histogram'] = macd - macd_signal
+
+        return df
+
+    def cal_adx(self, df, period=14):
+        """
+        ADX(Average Directional Index)를 순차적으로 계산하는 함수.
+        
+        매개변수:
+          df : pandas DataFrame - 'High', 'Low', 'Close' 컬럼이 포함되어 있어야 함.
+          period : int - ADX 계산에 사용할 기간 (기본값 14)
+        
+        반환:
+          df : 'ADX' 컬럼이 추가된 DataFrame.
+        
+        주의: 이미 ADX 값이 존재하는 행은 재계산하지 않음.
+        """
+        # ADX 컬럼이 없으면 생성
+        if 'ADX' not in df.columns:
+            df['ADX'] = np.nan
+        # 임시 계산용 컬럼들도 생성 (이미 존재한다면 그대로 사용)
+        for col in ['TR', '+DM', '-DM']:
+            if col not in df.columns:
+                df[col] = np.nan
+
+        n = len(df)
+        if n < period + 1:
+            # 충분한 데이터가 없으면 그대로 반환
+            return df
+
+        # 기존에 계산된 마지막 인덱스 확인
+        last_valid = df['ADX'].last_valid_index()
+        if last_valid is None:
+            last_valid = -1  # 전부 NaN인 경우
+
+        # 먼저, 모든 행에 대해 TR, +DM, -DM 계산 (이미 값이 있으면 건너뜀)
+        for i in range(1, n):
+            if pd.isna(df.loc[i, 'TR']):
+                high = df.loc[i, 'High']
+                low = df.loc[i, 'Low']
+                prev_close = df.loc[i-1, 'Close']
+                df.loc[i, 'TR'] = max(high - low, abs(high - prev_close), abs(low - prev_close))
+            if pd.isna(df.loc[i, '+DM']):
+                up_move = df.loc[i, 'High'] - df.loc[i-1, 'High']
+                down_move = df.loc[i-1, 'Low'] - df.loc[i, 'Low']
+                df.loc[i, '+DM'] = up_move if (up_move > down_move and up_move > 0) else 0
+            if pd.isna(df.loc[i, '-DM']):
+                up_move = df.loc[i, 'High'] - df.loc[i-1, 'High']
+                down_move = df.loc[i-1, 'Low'] - df.loc[i, 'Low']
+                df.loc[i, '-DM'] = down_move if (down_move > up_move and down_move > 0) else 0
+
+        # 시작 인덱스: 이미 계산된 마지막 인덱스 + 1, 단 최소 period 인덱스부터 계산
+        start_index = max(last_valid + 1, period)
+        
+        # 초기 스무딩: 인덱스 1부터 period까지의 합을 사용 (단, start_index가 period인 경우)
+        if start_index == period:
+            sm_TR = df['TR'].iloc[1:period+1].sum()
+            sm_plusDM = df['+DM'].iloc[1:period+1].sum()
+            sm_minusDM = df['-DM'].iloc[1:period+1].sum()
+            # 초기 DX 계산
+            if sm_TR == 0:
+                DI_plus = 0
+                DI_minus = 0
+            else:
+                DI_plus = 100 * (sm_plusDM / sm_TR)
+                DI_minus = 100 * (sm_minusDM / sm_TR)
+            DX = 100 * abs(DI_plus - DI_minus) / (DI_plus + DI_minus) if (DI_plus + DI_minus) != 0 else 0
+            # 초기 ADX는 아직 미정으로 남김
+            df.loc[period, 'ADX'] = np.nan
+            # 누적 DX 합, 개수 (초기 ADX 계산용)
+            dx_sum = DX
+            dx_count = 1
+            current_sm_TR = sm_TR
+            current_sm_plusDM = sm_plusDM
+            current_sm_minusDM = sm_minusDM
+        else:
+            # 이미 일부 ADX가 계산되어 있다면, 복원
+            # (이 경우, 이전 스무딩 값은 계산되지 않았으므로, 여기서는 다시 계산하지 않고 이어서 처리합니다.)
+            # 주의: 연속성이 깨질 수 있으므로, 데이터 업데이트 시에는 전체 계산을 권장합니다.
+            current_sm_TR = df['TR'].iloc[start_index-1]
+            current_sm_plusDM = df['+DM'].iloc[start_index-1]
+            current_sm_minusDM = df['-DM'].iloc[start_index-1]
+            dx_sum = 0
+            dx_count = 0
+
+        # Wilder 스무딩 방식으로 ADX 계산: start_index부터 n-1까지
+        for i in range(start_index, n):
+            current_sm_TR = current_sm_TR - (current_sm_TR / period) + df.loc[i, 'TR']
+            current_sm_plusDM = current_sm_plusDM - (current_sm_plusDM / period) + df.loc[i, '+DM']
+            current_sm_minusDM = current_sm_minusDM - (current_sm_minusDM / period) + df.loc[i, '-DM']
+            
+            if current_sm_TR == 0:
+                DI_plus = 0
+                DI_minus = 0
+            else:
+                DI_plus = 100 * (current_sm_plusDM / current_sm_TR)
+                DI_minus = 100 * (current_sm_minusDM / current_sm_TR)
+            DX = 100 * abs(DI_plus - DI_minus) / (DI_plus + DI_minus) if (DI_plus + DI_minus) != 0 else 0
+            
+            # 초기 ADX 구간: i가 period*2 미만인 경우, 누적 DX로 평균을 구함
+            if i < period * 2:
+                dx_sum += DX
+                dx_count += 1
+                df.loc[i, 'ADX'] = np.nan
+            elif i == period * 2:
+                dx_sum += DX
+                dx_count += 1
+                adx = dx_sum / dx_count
+                df.loc[i, 'ADX'] = adx
+            else:
+                prev_adx = df.loc[i-1, 'ADX']
+                adx = (prev_adx * (period - 1) + DX) / period
+                df.loc[i, 'ADX'] = adx
+
+        # 기존에 이미 계산된 ADX 값은 유지하고, 새로 계산한 값만 업데이트하였으므로 완료 후, 임시 컬럼 삭제
+        df.drop(columns=['TR', '+DM', '-DM'], inplace=True)
+        return df
+
     def LT_trand_check(self, df):
         """
         상승 및 하락 추세 판단 함수
@@ -463,7 +584,7 @@ class Data_Control():
             # 모든 SMA(20,60,120)가 서로 근접 → 완전 박스권
             # -------------------------------------------------------
             if near_20_60 and near_20_120 and near_60_120:
-                return 10  # Code 10: 단기·중기·장기 선이 사실상 동일 -> 강한 횡보(추세 모호)
+                return 0  # Code 0: 단기·중기·장기 선이 사실상 동일 -> 강한 횡보(추세 모호)
 
             # (A) 강한 상승 배열: sma120 < sma60 < sma20
             if sma120 < sma60 < sma20:
@@ -554,7 +675,7 @@ class Data_Control():
             df.loc[i, 'RBW'] = rbw
 
             # MA 트렌드 판별 (새로운 함수 활용)
-            trend_state = check_ma_trend(sma20, sma60, sma120, rbw)
+            trend_state = int(check_ma_trend(sma20, sma60, sma120, rbw))
 
             # Trend 컬럼에 상태 업데이트
             df.loc[i, 'trend'] = trend_state
@@ -664,3 +785,15 @@ class Data_Control():
         except Exception as e:
             print(f"데이터 업데이트 중 오류 발생: {e}")
             return existing_data
+        
+    def cal_indicator(self, data):
+        data = self.cal_moving_average(data)
+        data = self.cal_rsi(data)
+        # data = self.cal_bollinger_band(data)
+        # data = self.cal_obv(data)
+        # data = self.LT_trand_check(data)
+        # data = self.cal_atr(data)
+        data = self.cal_macd(data)
+        # data = self.cal_adx(data)
+
+        return data

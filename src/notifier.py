@@ -1,4 +1,11 @@
-from config import Config
+import sys
+import os
+
+# 프로젝트 루트 디렉토리의 절대 경로를 구함
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from src.config import Config
 from binance.client import Client
 from slack_sdk import WebClient
 
@@ -15,8 +22,8 @@ class Notifier():
             self.target_coins.append(coins[i])
         self.future_target_coins = ["USDT", ]
         future_coins = self.config.futures_coin_tickers.split(" ")
-        for i in range(len(future_coins)):
-            self.future_target_coins.append(coins[i])
+        for j in range(len(future_coins)):
+            self.future_target_coins.append(future_coins[j])
 
     def get_asset_info(self):
         """반환 형태 예시
@@ -81,7 +88,7 @@ class Notifier():
                     continue
 
                 # 6. 평균 매수 가격 계산
-                trades = self.client.get_my_trades(f"{asset}USDT")
+                trades = self.client.get_my_trades(symbol=f"{asset}USDT")
                 total_cost = 0
                 total_trade_quantity = 0
 

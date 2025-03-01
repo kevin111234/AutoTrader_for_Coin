@@ -130,8 +130,10 @@ class Order:
                 price=round(take_profit_price, 2),  # 익절 지정가
                 stopPrice=round(stop_loss_price, 2),  # 손절 트리거가
                 stopLimitPrice=round(stop_loss_price * 0.99, 2),  # 손절 지정가
-                stopLimitTimeInForce="GTC"  # 손절 주문 지속 시간 설정
-            )
+                stopLimitTimeInForce="GTC",  # 손절 주문 지속 시간 설정
+                aboveType="STOP_LOSS_LIMIT",  # ✅ Binance API 요구 사항 추가
+                belowType="LIMIT_MAKER"  # ✅ Binance API 요구 사항 추가
+                )
             print(f"OCO 주문 생성 성공: {order}")
             return order
 
