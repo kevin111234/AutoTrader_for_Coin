@@ -54,7 +54,7 @@ def main():
     future_symbol_info = {}
 
     buy_sell_status = {ticker: {"buy_stage": 0} for ticker in ticker_list}
-    futures_status = {ticker: {"position": None, "stage": 0} for ticker in future_ticker_list}
+    if future_use: futures_status = {ticker: {"position": None, "stage": 0} for ticker in future_ticker_list}
     for symbol in ticker_list:
         initial_data[symbol] = {}
         vp_data[symbol] = {}
@@ -64,6 +64,7 @@ def main():
         # 1분봉, 5분봉, 1시간봉 각각 300개의 데이터 조회
         for timeframe in ["1m", "5m", "1h"]:
             data = data_control.data(client, symbol, timeframe, limit=300)
+
             # 각 데이터에 대한 기술적 지표 계산
             data = data_control.cal_indicator(data)
 
@@ -75,10 +76,6 @@ def main():
                 data = data.iloc[-140:].reset_index(drop=True)
             initial_data[symbol][timeframe] = data
             # 남은 데이터에 대한 VP, TPO 계산
-            profile_df, sr_levels = data_control.cal_tpo_volume_profile(data)
-            
-            vp_data[symbol][timeframe] = profile_df
-            tpo_data[symbol][timeframe] = sr_levels
 
         if future_use:
             for symbol in future_ticker_list:
@@ -98,11 +95,6 @@ def main():
                     if len(future_data) > 140:
                         future_data = future_data.iloc[-140:].reset_index(drop=True)
                     futures_data[symbol][timeframe] = future_data
-                    # 남은 데이터에 대한 VP, TPO 계산
-                    profile_df, sr_levels = data_control.cal_tpo_volume_profile(future_data)
-                    
-                    futures_vp_data[symbol][timeframe] = profile_df
-                    futures_tpo_data[symbol][timeframe] = sr_levels
 
     # 초기 자산 조회 - notifier.py
     notifier.get_asset_info()
@@ -188,13 +180,15 @@ def main():
                     # 매수/매도 판단
                     account_info = notifier.futures_asset_info.get(f"{symbol}USDT", {"position": None, "entry_price": None, "holdings": 0})
                     signal = {}
-                    signal = strategy.signal(futures_data[ticker], True)
+                    signal = strategy.signal(futures_data[ticker], True, account_info)
 
                     if signal["signal"] == "close":
                         if futures_status[ticker].get("position") == "LONG":
                             signal["signal"] = "L_sell"
+                            signal['weight'] = 5
                         elif futures_status[ticker].get("position") == "SHORT":
                             signal["signal"] = "S_sell"
+                            signal['weight'] = 5
                         else:
                             signal["signal"] = "Hold"
 
