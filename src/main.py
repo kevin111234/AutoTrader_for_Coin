@@ -1,6 +1,7 @@
 from binance.client import Client
 import time
 import math
+from datetime import datetime, timedelta
 import sys
 import os
 
@@ -15,6 +16,23 @@ from src.strategy import Strategy
 from src.order_executor import Order
 from src.trade_manager import TradeManager
 import src.utils
+
+def round_up_to_next_hour(dt: datetime) -> datetime:
+    """
+    dt 시각을 받아, 다음 정각(시+1, 분=0, 초=0, 마이크로초=0)을 반환.
+    예) 12:47 -> 13:00, 13:00 -> 14:00
+    """
+    # 현재 시각의 시, 분, 초, 마이크로초를 추출
+    year = dt.year
+    month = dt.month
+    day = dt.day
+    hour = dt.hour
+
+    # 만약 현재 시간이 이미 xx:00 정각이라면, 바로 다음 정각은 hour+1
+    if dt.minute == 0 and dt.second == 0 and dt.microsecond == 0:
+        return datetime(year, month, day, hour) + timedelta(hours=1)
+    else:
+        return datetime(year, month, day, hour) + timedelta(hours=1)
 
 def main():
     print("투자 프로그램을 시작합니다.")
@@ -103,6 +121,9 @@ def main():
     future_limit_amount = notifier.futures_get_limit_amount()
 
     notifier.send_asset_info(spot_limit_amount, future_limit_amount)
+
+    now = datetime.now()
+    next_report_time = round_up_to_next_hour(now)  # 바로 다음 정각
 
     # 반복문 시작
     while True:
@@ -203,6 +224,47 @@ def main():
                     
                     # 1초 대기
                     time.sleep(1)
+
+            current_time = datetime.now()
+            if current_time >= next_report_time:
+                # 현물 잔고 예시
+                usdt_balance = notifier.asset_info.get("USDT", {}).get("total_quantity", 0)
+                message_spot = f"📊 [현물] USDT 잔고: {usdt_balance:.2f}\n"
+                for sym in ticker_list:
+                    if sym == "USDT":
+                        continue
+                    info = notifier.asset_info.get(sym, {})
+                    qty = info.get("total_quantity", 0)
+                    avg_price = info.get("average_buy_price", 0)
+                    cur_price = info.get("current_price", 0)
+                    prof_rate = info.get("profit_rate", 0)
+                    if qty > 0:
+                        message_spot += f"  - {sym}: 수량 {qty:.4f}, 평단 {avg_price:.4f}, 현재가 {cur_price:.4f}, 수익률 {prof_rate:.2f}%\n"
+
+                # 선물 잔고 / 포지션
+                message_fut = ""
+                if future_use:
+                    fut_balance = notifier.futures_asset_info.get("USDT", {}).get("balance", 0)
+                    message_fut = f"\n📊 [선물] USDT 잔고: {fut_balance:.2f}\n"
+                    for s in future_ticker_list:
+                        pos_info = notifier.futures_asset_info.get(f"{s}USDT", {})
+                        position_amt = pos_info.get("position_amt", 0)
+                        entry_price = pos_info.get("entry_price", 0)
+                        unrealized_profit = pos_info.get("unRealizedProfit", 0)
+                        if position_amt != 0:
+                            message_fut += (
+                                f"  - {s}: 포지션 {position_amt:.4f}, "
+                                f"진입가 {entry_price:.4f}, 미실현손익 {unrealized_profit:.2f}\n"
+                            )
+
+                final_message = (
+                    f"[{current_time.strftime('%Y-%m-%d %H:%M')} 정각 보고]\n\n"
+                    f"{message_spot}{message_fut}"
+                )
+                notifier.send_slack_message(config.slack_asset_channel_id, final_message)
+
+                # 다음 알림 시점 = 현재 정각 + 1시간
+                next_report_time = next_report_time + timedelta(hours=1)
 
         except Exception as e:
             print(f"메인 루프 오류: {e}")
