@@ -14,7 +14,7 @@ class Strategy:
     def __init__(self):
         pass
 
-    def signal(self, data_dict, future):
+    def signal(self, data_dict, future, account_info):
         """
         data_dict: {
             "1m": DataFrame(...),
@@ -33,7 +33,7 @@ class Strategy:
 
         try:
 
-            current_price, signal, weight, reason, stop_loss, take_profit = src.utils.MACD_signal(data_dict, future)
+            current_price, signal, weight, reason, stop_loss, take_profit = src.utils.MACD_signal(data_dict, future, account_info)
 
             print(signal, reason)
 

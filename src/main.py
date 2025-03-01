@@ -153,9 +153,11 @@ def main():
                     updated_data = data_control.cal_indicator(updated_data)
                     initial_data[ticker][timeframe] = updated_data
 
+                account_info = notifier.asset_info.get(ticker, {"position": None, "entry_price": None, "holdings": 0})
+
                 # 매수/매도 판단
                 signal = {}
-                signal = strategy.signal(initial_data[ticker], False)
+                signal = strategy.signal(initial_data[ticker], False, account_info)
 
                 # 주문 진행
                 # 모듈화된 매매 로직 호출
@@ -184,16 +186,17 @@ def main():
                         futures_data[ticker][timeframe] = updated_data
 
                     # 매수/매도 판단
+                    account_info = notifier.futures_asset_info.get(f"{symbol}USDT", {"position": None, "entry_price": None, "holdings": 0})
                     signal = {}
                     signal = strategy.signal(futures_data[ticker], True)
 
-                if signal["signal"] == "close":
-                    if futures_status[ticker].get("position") == "LONG":
-                        signal["signal"] = "L_sell"
-                    elif futures_status[ticker].get("position") == "SHORT":
-                        signal["signal"] = "S_sell"
-                    else:
-                        signal["signal"] = "Hold"
+                    if signal["signal"] == "close":
+                        if futures_status[ticker].get("position") == "LONG":
+                            signal["signal"] = "L_sell"
+                        elif futures_status[ticker].get("position") == "SHORT":
+                            signal["signal"] = "S_sell"
+                        else:
+                            signal["signal"] = "Hold"
 
                     # 모듈화된 선물 거래 로직 호출
                     trade_manager.process_futures_trade(

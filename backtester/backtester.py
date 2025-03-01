@@ -55,7 +55,13 @@ def backtester(start_date, end_date):
             data_dict[symbol]["1h"] = cal_indicator(updated_data_1h)
 
         # 데이터 정제
-        signal_info = strategy.signal(data_dict[symbol], False)
+        account_info = {
+        "position": engine.position,
+        "entry_price": engine.entry_price,
+        "holdings": engine.total_holdings
+        }
+
+        signal_info = strategy.signal(data_dict[symbol], False, account_info)
         engine.execute_trade(signal_info["signal"], signal_info)
 
         # ✅ 1시간마다 현재 상태 출력
