@@ -35,8 +35,6 @@ class Strategy:
 
             current_price, signal, weight, reason, stop_loss, take_profit = src.utils.MACD_signal(data_dict, future, account_info)
 
-            print(signal, reason)
-
             # 결과 반환
             return {
                 "current_price": current_price,
