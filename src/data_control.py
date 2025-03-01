@@ -790,8 +790,10 @@ class Data_Control():
         data = self.cal_moving_average(data)
         data = self.cal_rsi(data)
         data = self.cal_bollinger_band(data)
-        data = self.cal_obv(data)
+        # data = self.cal_obv(data)
         data = self.LT_trand_check(data)
-        data = self.cal_atr(data)
+        # data = self.cal_atr(data)
         data = self.cal_macd(data)
-        data = self.cal_adx(data)
+        # data = self.cal_adx(data)
+
+        return data
