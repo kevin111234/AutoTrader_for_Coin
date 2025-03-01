@@ -227,41 +227,7 @@ def main():
 
             current_time = datetime.now()
             if current_time >= next_report_time:
-                # 현물 잔고 예시
-                usdt_balance = notifier.asset_info.get("USDT", {}).get("total_quantity", 0)
-                message_spot = f"📊 [현물] USDT 잔고: {usdt_balance:.2f}\n"
-                for sym in ticker_list:
-                    if sym == "USDT":
-                        continue
-                    info = notifier.asset_info.get(sym, {})
-                    qty = info.get("total_quantity", 0)
-                    avg_price = info.get("average_buy_price", 0)
-                    cur_price = info.get("current_price", 0)
-                    prof_rate = info.get("profit_rate", 0)
-                    if qty > 0:
-                        message_spot += f"  - {sym}: 수량 {qty:.4f}, 평단 {avg_price:.4f}, 현재가 {cur_price:.4f}, 수익률 {prof_rate:.2f}%\n"
-
-                # 선물 잔고 / 포지션
-                message_fut = ""
-                if future_use:
-                    fut_balance = notifier.futures_asset_info.get("USDT", {}).get("balance", 0)
-                    message_fut = f"\n📊 [선물] USDT 잔고: {fut_balance:.2f}\n"
-                    for s in future_ticker_list:
-                        pos_info = notifier.futures_asset_info.get(f"{s}USDT", {})
-                        position_amt = pos_info.get("position_amt", 0)
-                        entry_price = pos_info.get("entry_price", 0)
-                        unrealized_profit = pos_info.get("unRealizedProfit", 0)
-                        if position_amt != 0:
-                            message_fut += (
-                                f"  - {s}: 포지션 {position_amt:.4f}, "
-                                f"진입가 {entry_price:.4f}, 미실현손익 {unrealized_profit:.2f}\n"
-                            )
-
-                final_message = (
-                    f"[{current_time.strftime('%Y-%m-%d %H:%M')} 정각 보고]\n\n"
-                    f"{message_spot}{message_fut}"
-                )
-                notifier.send_slack_message(config.slack_asset_channel_id, final_message)
+                notifier.send_asset_info(spot_limit_amount, future_limit_amount)
 
                 # 다음 알림 시점 = 현재 정각 + 1시간
                 next_report_time = next_report_time + timedelta(hours=1)
