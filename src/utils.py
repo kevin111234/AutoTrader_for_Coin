@@ -209,6 +209,8 @@ def MACD_signal(data_dict, future, account_info):
     else:
         weight = 0
         signal = "close" if future else "hold"
+        if abs(math.log(sma20) - math.log(sma60)) <= 0.0005:
+            signal = "hold"
         reason = "이동평균선 배치가 명확하지 않음"
 
     # 매수 후 처음 수익률 0.5% 돌파 시 profit_sell 조건 적용 (단, 아직 sell 신호가 발생하지 않은 경우)
@@ -218,13 +220,17 @@ def MACD_signal(data_dict, future, account_info):
         reason = "수익률 0.5% 돌파"
         profit_sell = True
 
-    # 추가 RSI 조건 (예시)
+    # 추가 RSI 조건
     if rsi_curr > 70 and profit_rate > 1.0:
-        signal = "sell"
+        signal = "sell" if not future else "L_sell"
         weight = 3
         reason = "RSI 70 돌파"
         if rsi_curr > 80:
             weight += 2
             reason = "RSI 80 돌파"
+
+    if profit_rate < -2:
+        signal = "sell" if not future else "close"
+        weight = 5
 
     return current_price, signal, weight, reason, stop_loss, take_profit
