@@ -77,6 +77,8 @@ def get_symbol_info(symbol, client):
         print(f"거래 제한 정보 조회 중 오류 발생: {e}")
         return {"stepSize": 1.0, "minQty": 0.0}
 
+import math
+
 def MACD_signal(data_dict, future, account_info):
     global profit_sell
 
@@ -106,9 +108,13 @@ def MACD_signal(data_dict, future, account_info):
     ma_up = (sma20 > sma60) and (sma60 > sma120)
     ma_down = (sma120 > sma60) and (sma60 > sma20)
 
-    isnear2060 = abs(sma20 - sma60) <= abs(sma60) * 0.005
+    if abs(math.log(sma20) - math.log(sma60)) <= 0.0005:
+        print("SMA20과 SMA60이 매우 근접함 (횡보 가능성)")
+        ma_up = False
+        ma_down = False
+    else:
+        print("SMA20과 SMA60이 일정 거리 이상 떨어짐 (추세 진행 중)")
 
-    if isnear2060:
         ma_up = False
         ma_down = False
     
@@ -139,14 +145,12 @@ def MACD_signal(data_dict, future, account_info):
     # 상승추세: 롱 포지션 관련 신호
     if ma_up:
         # 롱 진입 조건 (매수)
-        buy_weight = 1  # 기본 +1
-        reason_buy = "상승추세: 기본 +1"
         if macd_curr > 0:
-            buy_weight += 2
+            buy_weight = 2
             reason_buy += ", MACD 양수 +2"
         if prev_macd_range.min() < 0 and macd_curr > 0:
-            buy_weight += 2
-            reason_buy += ", MACD 상향돌파 +2"
+            buy_weight += 3
+            reason_buy += ", MACD 상향돌파 +3"
         # 롱 청산 조건 (매도)
         sell_weight = 0
         reason_sell = ""
@@ -205,6 +209,8 @@ def MACD_signal(data_dict, future, account_info):
     else:
         weight = 0
         signal = "close" if future else "hold"
+        if abs(math.log(sma20) - math.log(sma60)) <= 0.0005:
+            signal = "hold"
         reason = "이동평균선 배치가 명확하지 않음"
 
     # 매수 후 처음 수익률 0.5% 돌파 시 profit_sell 조건 적용 (단, 아직 sell 신호가 발생하지 않은 경우)
@@ -214,13 +220,17 @@ def MACD_signal(data_dict, future, account_info):
         reason = "수익률 0.5% 돌파"
         profit_sell = True
 
-    # 추가 RSI 조건 (예시)
+    # 추가 RSI 조건
     if rsi_curr > 70 and profit_rate > 1.0:
-        signal = "sell"
+        signal = "sell" if not future else "L_sell"
         weight = 3
         reason = "RSI 70 돌파"
         if rsi_curr > 80:
             weight += 2
             reason = "RSI 80 돌파"
+
+    if profit_rate < -2:
+        signal = "sell" if not future else "close"
+        weight = 5
 
     return current_price, signal, weight, reason, stop_loss, take_profit
